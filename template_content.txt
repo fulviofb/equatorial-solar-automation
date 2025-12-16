@@ -1,0 +1,273 @@
+--- PARAGRAPHS ---
+MODELO DE MEMORIAL TÉCNICO DESCRITIVO
+MICROGERAÇÃO DISTRIBUÍDA UTILIZANDO UM SISTEMA SOLAR FOTOVOLTAICA DE 7,00 kW CONECTADO À REDE DE ENERGIA ELÉTRICA DE BAIXA TENSÃO EM 220V CARACTERIZADO COMO AUTOCONSUMO REMOTO
+ADÃO MARCELINO DA SILVA
+RG: 1154690 SSP GO
+FÚLVIO FERREIRA BORGES
+TÉCNICO EM ELETROTÉCNICA
+REGISTRO: 02012721133
+GOIÂNIA – GO
+JULHO – 2025
+LISTA DE SIGLAS E ABREVIATURAS
+ABNT: Associação Brasileira de Normas Técnicas
+ANEEL: Agência Nacional de Energia Elétrica
+BT: Baixa tensão (220/127 V, 380/220 V)
+C.A: Corrente Alternada
+C.C: Corrente Contínua
+CD: Custo de disponibilidade (30 kWh, 50kWh ou 100 kWh em sistemas de baixa tensão monofásicos, bifásicos ou trifásicos, respectivamente)
+CI: Carga Instalada
+DSP: Dispositivo Supressor de Surto
+DSV: Dispositivo de seccionamento visível
+FP: Fator de potência
+FV: Fotovoltaico
+GD: Geração distribuída
+HSP: Horas de sol pleno
+IEC: International Electrotechnical Commission
+IN: Corrente Nominal
+IDG: Corrente nominal do disjuntor de entrada da unidade consumidora em ampéres (A)
+Ist: Corrento de curto-circuito de módulo fotovoltaico em ampéres (A)
+kW: kilo-watt
+kWp: kilo-watt pico
+kWh: kilo-watt-hora
+MicroGD: Microgeração distribuída
+MT: Média tensão (13.8 kV, 34.5 kV)
+NF: Fator referente ao número de fases, igual a 1 para sistemas monofásicos e bifásicos ou   para sistemas trifásicos
+PRODIST: Procedimentos de Distribuição
+PD: Potência disponibilizada para a unidade consumidora onde será instalada a geração distribuída
+PR: Pára-raio
+QGD: Quadro Geral de Distribuição
+QGBT: Quadro Geral de Baixa Tensão
+REN: Resolução Normativa
+SPDA: Sistema de Proteção contra Descargas Atmosféricas
+SFV: Sistema Fotovoltaico
+SFVCR: Sistema Fotovoltaico Conectado à Rede
+TC: Transformador de corrente
+TP: Transformador de potencial
+UC: Unidade Consumidora
+UTM: Universal Transversa de Mercator
+VN: Tensão nominal de atendimento em volts (V)
+Voc: Tensão de circuito aberto de módulo fotovoltaico em volts (V)
+SUMÁRIO
+1.	OBJETIVO	4
+2.	REFERÊNCIAS NORMATIVAS E REGULATÓRIA	4
+3.	DADOS DA UNIDADE CONSUMIDORA	5
+4.	LEVANTAMENTO DE CARGA	5
+5.	PADRÃO DE ENTRADA	6
+5.1.	Tipo de Ligação e Tensão de Atendimento	6
+5.2.	Disjuntor de Entrada	6
+5.3.	Potência Disponibilizada	6
+5.4.	Caixa de Medição	7
+5.5.	Ramal de Entrada	7
+6.	ESTIMATIVA DE GERAÇÃO	7
+7.	DIMENSIONAMENTO DO GERADOR	7
+7.1.	Dimensionamento do gerador	7
+8.	DIMENSIONAMENTO DO INVERSOR (SE HOUVER)	8
+9.	DIMENSIONAMENTO DA PROTEÇÃO	8
+9.1.	Fusíveis	8
+9.2.	Disjuntores	8
+9.3.	Dispositivo de seccionamento visível (quando houver)	9
+9.4.	DPS	9
+9.5.	Aterramento	9
+9.6.	Requisitos de Proteção	9
+10.	DIMENSIONAMENTO DOS CABOS	10
+11.	PLACA DE ADVERTÊNCIA	10
+12.	ANEXOS	11
+OBJETIVO
+O presente memorial técnico descritivo tem como objetivo apresentar a metodologia utilizada para elaboração e apresentação à EQUATORIAL GO, dos documentos mínimos necessários, em conformidade com a REN 482, com o PRODIST Módulo 3 secção 3.7, com a NT.020 e com as normas técnicas nacionais (ABNT) ou internacionais (europeia e americana), para SOLICITAÇÃO DO PARECER DE ACESSO de uma microgeração distribuída conectada à rede de distribuição de energia elétrica através sistema SOLAR FOTOVOLTAICA de 7,00 kW, composto por 10 módulos HONOR, modelo HY-M12/132G de 700W ligados a 3 inversores marca FOXESS, modelo Q1-2500-E Certificado de Conformidade n° 004468/2025, caracterizado como AUTOCONSUMO REMOTO.
+REFERÊNCIAS NORMATIVAS E REGULATÓRIA
+Para elaboração deste memorial técnico descritivo, no âmbito da área de concessão do estado de (o) GOIÁS foram utilizadas as normas e resoluções, nas respectivas revisões vigentes, conforme descritas abaixo:
+ABNT NBR 5410: Instalações Elétricas de Baixa Tensão.
+ABNT NBR 10899: Energia Solar Fotovoltaica – Terminologia.
+ABNT NBR 11704: Sistemas Fotovoltaicos – Classificação.
+ABNT NBR 16149: Sistemas fotovoltaicos (FV) – Características da interface de conexão com a rede elétrica de distribuição.
+ABNT NBR 16150: Sistemas fotovoltaicos (FV) – Características da interface de conexão coma rede elétrica de distribuição – Procedimentos de ensaio de conformidade.
+ABNT NBR IEC 62116: Procedimento de Ensaio de Anti-ilhamento para Inversores de Sistemas Fotovoltaicos Conectados à Rede Elétrica.
+EQUATORIAL ENERGIA NT.00020.EQTL.Normas e Padrões – Conexão de Microgeração Distribuída ao Sistema de Baixa Tensão.
+EQUATORIAL ENERGIA NT.00001.EQTL.Normas e Padrões – Fornecimento de Energia Elétrica em Baixa Tensão.
+EQUATORIAL ENERGIA NT.00030.EQTL.Normas e Padrões - Padrões Construtivos de Caixas de Medição e Proteção.
+ANEEL Procedimentos de Distribuição de Energia Elétrica no Sistema Elétrico Nacional – PRODIST: Módulo 3 – Conexão ao Sistema de Distribuição de Energia Elétrica.
+ANEEL Resolução Normativa nº 1000, de 07 de dezembro de 2021, que estabelece as regras de prestação do serviço público de distribuição de energia elétrica.
+IEC 61727 Photovoltaic (PV) Systems - Characteristics of the Utility Interface
+IEC 62116:2014 Utility-interconnected photovoltaic inverters - Test procedure of islanding prevention measures
+DADOS DA UNIDADE CONSUMIDORA
+Número da Conta Contrato: 11517621
+Classe: URBANA
+Nome do Titular da CC: ADÃO MARCELINO DA SILVA
+Endereço Completo: RUA DA UNIÃO, QD. 171, LT. 15, S/N, JD. NOVA ESPERANÇA, GOIANIA - GO
+Número de identificação do poste e/ou transformador mais próximo: ILEGÍVEL
+Coordenadas georrefenciadas: 16°38'29.0"S 49°19'36.3"W
+Figura 1: Localização da unidade consumidora.
+LEVANTAMENTO DE CARGA
+Tabela 1 – Levantamento de carga
+PADRÃO DE ENTRADA
+Tipo de Ligação e Tensão de Atendimento
+A unidade consumidora é (será) ligada em ramal de ligação em baixa tensão, através de um circuito monofásico à dois condutores, sendo um condutor(es) FASE de seção nominal 10 mm2 e um condutor NEUTRO de seção nominal 10 mm2, com tensão de atendimento em 220 V, derivado de uma rede aérea de distribuição secundária da EQUATORIAL ENERGIA no estado de(o) GOIÁS.
+Disjuntor de Entrada
+No ponto de entrega/conexão é (será) instalado um disjuntor termomagnético, em conformidade com a norma NT.00001.EQTL.Normas e Padrões da Equatorial Energia, com as seguintes características:
+NÚMERO DE POLOS: 1
+TENSÃO NOMINAL: 220 V
+CORRENTE NOMINAL: 40 A
+FREQUÊNCIA NOMINAL: 60 HZ
+ELEMENTO DE PROTECAO: TERMOMAGNÉTICO
+CAPACIDADE MAXIMA DE INTERRUPCAO: 3 kA;
+ACIONAMENTO: Manual (mecanismo tipo alavanca)
+CURVA DE ATUACAO (DISPARO): CURVA C.
+Potência Disponibilizada
+A potência disponibilizada para unidades consumidora onde será instalada a microGD é (será) igual à:
+PD [kVA] = (VN [V] X IDG [A] X NF)/1000
+PD [kW] = PD [kVA] x FP
+VN = XXX V
+IDG = XXX A
+NF = X
+FP = XXX
+PD (kVA) = XX KVA
+PD (kW) = 7,00 kW
+NOTA 1: A potência de geração deve ser menor ou igual a potência disponibilizada PD em kW.
+NOTA 2: VN é a tensão nominal entre fase e neutro para instalações monofásicas ou entre fases para bifásicas e trifásicas.
+NOTA 3: NF  é um fator referente ao número de fases, igual a 1 para sistemas monofásicos e bifásicos ou   para sistemas trifásicos.
+Caixa de Medição
+A caixa de medição existente monofásica em material metálico tem (terá) as dimensões de 250 mm x 320 mm x 170 mm (comprimento, altura e largura), está (será) instalada em poste auxiliar, no ponto de entrega caracterizado como o limite da via pública com a propriedade, conforme fotos abaixo, atendendo aos requisitos de localização, facilidade de acesso e lay-out, em conformidade com as normas da concessionária NT.00001.EQTL e NT.00030.EQTL, conforme a FIGURA 2.
+Figura 2: Desenho dimensional detalhado da caixa de medição.
+O aterramento da caixa de medição é(será) com 1 hastes de aterramento de comprimento 2,4 m e diâmetro 5/8 polegada”, condutor de 10 mm2 com conexão em conector tipo grampo.
+Ramal de Entrada
+O ramal de entrada da unidade consumidora é (será), através de um circuito monofásico à dois condutores, sendo um condutor(es) FASE de diâmetro nominal 10 mm2 e um condutor NEUTRO de diâmetro nominal 10 mm2, em 220 V.
+ESTIMATIVA DE GERAÇÃO
+DIMENSIONAMENTO DO GERADOR
+Dimensionamento do gerador
+Descrever o dimensionamento do gerador e informar as características técnicas.
+Tabela 3 – Características técnicas do gerador
+DIMENSIONAMENTO DO INVERSOR (SE HOUVER)
+Descrever o dimensionamento do inversor e informar as características técnicas.
+Tabela 4 – Características técnicas do inversor
+DIMENSIONAMENTO DA PROTEÇÃO
+Fusíveis
+Dimensionar e descrever as características técnicas dos fusíveis CC dos arranjos fotovoltaicos.
+Disjuntores
+Dimensionar e descrever as características técnicas dos fusíveis de disjuntores CA e CC:
+Número de pólos: 1
+Tensão nominal CA ou CC [V]: 220V
+Corrente Nominal [A]: 40A
+Frequência [Hz], para disjuntor CA: 60Hz
+Capacidade máxima de interrupção [kA]: 3 kA
+Curva de atuação: Curva C.
+Dispositivo de seccionamento visível (quando houver)
+Dimensionar e descrever as características técnicas do dispositivo de seccionamento visível.
+DPS
+Dimensionar e descrever as características técnicas dos DPSs CA e CC, informando no mínimo as seguintes características:
+Tipo CC ou CA: CA
+Classe: Classe II
+Tensão CC ou CA [V]: 275V
+Corrente nominal [kA]: 20 kA
+Corrente máxima [kA]: 45 kA
+Aterramento
+Dimensionar e descrever as características técnicas do aterramento, informando no mínimo as seguintes características:
+Quantidade de hastes: 1
+Valor da resistência de aterramento: 10 ohms
+Aterramento TN-S conforme NBR-5410, utilização da sinalização de segurança, conforme norma vigente.
+Requisitos de Proteção
+Tabela 5 – Características técnicas do gerador
+DIMENSIONAMENTO DOS CABOS
+Dimensionar e descrever as características técnicas dos cabos CA e CC, informando no mínimo as seguintes características:
+Isolação: XLPE
+Isolamento: 0,6/1 kV
+Bitola [mm2]: 6
+Capacidade de condução de corrente: 36A
+PLACA DE ADVERTÊNCIA
+Descrever forma e local de instalação, conforme modelo abaixo:
+Características da Placa:
+Espessura: 2 mm;
+Material: Policarbonato com aditivos anti-raios UV (ultravioleta);
+Gravação: As letras devem ser em Arial Black;
+Acabamento: Deve possuir cor amarela, obtida por processo de masterização com 2%, assegurando opacidade que permita adequada visualização das marcações pintadas na superfície da placa;
+Figura 3: Placa de advertência.
+ANEXOS
+Formulário de Solicitação de Orçamento.
+Documento de responsabilidade técnica (projeto e execução) do conselho profissional competente.
+Diagrama unifilar contemplando, geração, inversor (se houver), cargas, proteção e medição.
+Diagrama de blocos contemplando geração, inversor (se houver), cargas, proteção e medição.
+Relatório de ensaio, em língua portuguesa, atestando a conformidade de todos os conversores de potência para a tensão nominal de conexão com a rede, sempre que houver a utilização de conversores.
+Dados de registro.
+Lista de rateio dos créditos.
+Cópia de instrumento jurídico de solidariedade.
+Para cogeração documento que comprove o reconhecimento pela ANEEL.
+_____________________________________
+Fúlvio Ferreira Borges
+
+--- TABLES ---
+ITEM | DESCRIÇÃO | P (W)
+[A] | QUANT.
+[B] | CI (kW)
+[C = (A*B)/1000] | FP
+[D] | CI (kVA)
+[E = C/D] | FD
+[F] | D(kW)
+[G = CxF] | D(kVA)
+[H = ExF]
+1 | Lâmpadas LED | 9 | 10 | 0,09 | 0,9 | 0,10 | 0,8 | 0,072 | 0,080
+2 | Geladeira | 150 | 1 | 0,15 | 0,8 | 0,19 | 0,5 | 0,075 | 0,095
+3 | Chuveiro elétrico | 5500 | 1 | 5,50 | 1 | 5,50 | 0,4 | 2,20 | 2,20
+4 | Televisor | 100 | 2 | 0,20 | 0,9 | 0,22 | 0,7 | 0,14 | 0,154
+5 | Máquina de lavar | 500 | 1 | 0,50 | 0,9 | 0,56 | 0,5 | 0,25 | 0,28
+6 | Micro-ondas | 1200 | 1 | 1,20 | 0,9 | 1,33 | 0,4 | 0,48 | 0,53
+7 | Ferro Elétrico | 1200 | 1 | 1,20 | 0,95 | 1,26 | 0,4 | 0,48 | 0,504
+8 | Ventiladores | 80 | 1 | 0,08 | 0,9 | 0,09 | 0,4 | 0,048 | 0,054
+9 | Computador | 300 | 1 | 0,30 | 0,9 | 0,33 | 0,7 | 0,21 | 0,231
+10
+11
+12
+TOTAL
+Fabricante | HONOR
+Modelo | HY-M12/132G
+Potência nominal – Pn [W] | 700W
+Tensão de circuito aberto – Voc [V] | 47.9
+Corrente de curto circuito – Isc [A] | 18.49
+Tensão de máxima potência – Vpmp [V] | 40
+Corrente de máxima potência – Ipmp [A] | 17.51
+Eficiência [%] | 22.5
+Comprimento [m] | 2,384
+Largura [m] | 1,303
+Área [m2] | 3,106
+Peso [kg] | 38.7
+Quantidade | 10
+Potência do gerador [kW] | 7
+Fabricante | FOXESS
+Modelo | Q1-2500-E
+Quantidade | 3
+Entrada | Entrada
+Potência nominal – Pn [kW] | 0,7
+Máxima potência na entrada CC – Pmax-cc [kW] | 0,7
+Máxima tensão CC – Vcc-máx [V] | 60
+Máxima corrente CC – Icc-máx [V] | 20*4
+Máxima tensão MPPT – Vpmp-máx [V] | 60
+Mínima tensão MPPT – Vpmp-min [V] | 30
+Tensão CC de partida – Vcc-part [V] | 32
+Quantidade de Strings | 4
+Quantidade de entradas MPPT | 4
+Entrada | Entrada
+Potência nominal CA – Pca [kW] | 2,5
+Máxima potência na saída CA – Pca-máx [kW] | 2,5
+Máxima corrente na saída CA – Imáx-ca [A] | 11,36
+Tensão nominal CA – Vnon-ca [V] | 220
+Frequência nominal – Fn [Hz] | 60
+Máxima tensão CA – Vca-máx [V] | 230
+Mínima tensão CA – Vca-min [V] | 220
+THD de corrente [%] | <3
+Fator de potência | >0.99
+Tipo de conexão – número de fases + neutro + terra | 1+1+1
+Eficiência máxima [%] | 95.5
+REQUISITOS DE PROTEÇÃO | INDICAR SE POSSUI
+Proteção de subtensão (27) | SIM
+Proteção de sobretensão (59) | SIM
+Proteção de subfrequência (81U) | SIM
+Proteção de sobrefrequência (81O) | SIM
+Proteção contra desequilíbrio de corrente (46) | SIM
+Proteção contra reversão e desbalanço de tensão (47) | SIM
+Proteção de sobrecorrente (50/51 e 50N/51N) | SIM
+Proteção contra perda de rede (proteção anti-ilhamento) | SIM
+Check de sincronismo (25) | SIM
+Tempo de reconexão – temporizador (62) | SIM
+Proteção de Sobrecorrente com restrição de tensão (51V)
+Proteção de Sobrecorrente direcional (67-67N)
+Proteção direcional de potência (32)
+Proteção contra falha de disjuntor (50BF)
+Proteção LINHA VIVA / BARRA MORTA

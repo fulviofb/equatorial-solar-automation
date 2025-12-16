@@ -1,0 +1,6 @@
+__pycache__/
+Projetos_Gerados/
+*.zip
+*.log
+# Manter o template e o excel de exemplo, mas ignorar outros
+# Como não sabemos se haverá outros, vamos deixar assim por enquanto.
