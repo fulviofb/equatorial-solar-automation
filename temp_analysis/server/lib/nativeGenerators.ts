@@ -36,25 +36,6 @@ function gerarDescricaoSistema(modules: any[], inverters: any[]): string {
     return `${modDesc} ligados a ${invDesc}`;
 }
 
-function getEstadoExtenso(uf: string): string {
-    const estados: { [key: string]: string } = {
-        'GO': 'GOIÁS', 'SP': 'SÃO PAULO', 'MG': 'MINAS GERAIS', 'RJ': 'RIO DE JANEIRO',
-        'BA': 'BAHIA', 'PR': 'PARANÁ', 'RS': 'RIO GRANDE DO SUL', 'SC': 'SANTA CATARINA',
-        'PE': 'PERNAMBUCO', 'CE': 'CEARÁ', 'AM': 'AMAZONAS', 'PA': 'PARÁ',
-        'MT': 'MATO GROSSO', 'MS': 'MATO GROSSO DO SUL', 'DF': 'DISTRITO FEDERAL',
-        'ES': 'ESPÍRITO SANTO', 'MA': 'MARANHÃO', 'PB': 'PARAÍBA', 'RN': 'RIO GRANDE DO NORTE',
-        'AL': 'ALAGOAS', 'PI': 'PIAUÍ', 'SE': 'SERGIPE', 'RO': 'RONDÔNIA', 'TO': 'TOCANTINS',
-        'AC': 'ACRE', 'AP': 'AMAPÁ', 'RR': 'RORAIMA'
-    };
-    return estados[uf.toUpperCase()] || uf;
-}
-
-function gerarDescricaoSistema(modules: any[], inverters: any[]): string {
-    // Ex: "10 módulos Honor 700W e 3 inversores FoxESS 3kW..."
-    const modDesc = modules.map(m => `${m.qtd} módulos ${m.fabricante} de ${m.potencia}W`).join(', ');
-    const invDesc = inverters.map(i => `${i.qtd} inversores ${i.fabricante} de ${i.potencia_nominal_kw}kW`).join(', ');
-    return `${modDesc} ligados a ${invDesc}`;
-}
 
 export const NativeGenerator = {
 
