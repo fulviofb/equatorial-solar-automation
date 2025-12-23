@@ -1,0 +1,1 @@
+ALTER TABLE `inverters` ADD `euEfficiency` varchar(10);
