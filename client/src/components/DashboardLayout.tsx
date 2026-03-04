@@ -50,7 +50,7 @@ export default function DashboardLayout({
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
   });
-  const { loading, user } = useAuth();
+  const { loading, user, error } = useAuth();
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
@@ -79,6 +79,13 @@ export default function DashboardLayout({
               <p className="text-sm text-muted-foreground">
                 Please sign in to continue
               </p>
+              {error && (
+                <div className="mt-4 p-4 text-xs text-red-500 bg-red-50 border border-red-200 rounded text-left overflow-auto w-full max-h-64 shadow-inner">
+                  <p className="font-bold mb-1">Raw API Error:</p>
+                  <pre className="whitespace-pre-wrap break-all">{error instanceof Error ? error.message : "Unknown Error"}</pre>
+                  <pre className="whitespace-pre-wrap break-all mt-2">{JSON.stringify(error, null, 2)}</pre>
+                </div>
+              )}
             </div>
           </div>
           <Button
