@@ -257,6 +257,24 @@ class SDKServer {
   }
 
   async authenticateRequest(req: Request): Promise<User> {
+    // Mock login bypass if OAuth is not configured in Vercel.
+    if (!ENV.oAuthServerUrl) {
+      const mockOpenId = "mock-admin-offline";
+      let user = await db.getUserByOpenId(mockOpenId);
+      if (!user) {
+        await db.upsertUser({
+          openId: mockOpenId,
+          name: "Admin (Modo Offline)",
+          email: "admin@equatorial.com",
+          loginMethod: "mock",
+          role: "admin",
+          lastSignedIn: new Date(),
+        });
+        user = await db.getUserByOpenId(mockOpenId);
+      }
+      return user!;
+    }
+
     // Regular authentication flow
     const cookies = this.parseCookies(req.headers.cookie);
     const sessionCookie = cookies.get(COOKIE_NAME);
