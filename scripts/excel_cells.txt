@@ -1,0 +1,643 @@
+
+--- SHEET: ROTEIRO ---
+B2 | ROTEIRO DE PREENCHIMENTO DO FORMULÁRIO DE SOLICITAÇÃO DE ORÇAMENTO E RESPECTIVAS GUIAS
+B4 | 1º)
+C4 | Preencher a GUIA 0 nos campos correspontes ao tipo de fonte de geração de energia elétrica
+C5 | SOLAR FOTOVOLTAICA - Preencher os itens 1 (fonte) e 2 (inversor), conforme a quantidade de arranjos e inversores.
+C6 | No item 1, existem espaços para até 10 arranjos. Cada linha corresponde as informações de 1 arranjo, preencher cada célula, exceto as da coluna POTÊNCIA
+C7 | DE PICO e as células da linha TOTAL, pois estas células são calculadas automaticamente.
+C8 | No item 2, existem espaços para até 10 inversores. Cada linha corresponde as informações de 1 inversor, preencher todas as células, exceto a célula da linha
+C9 | TOTAL, pois está célula é calculada automaticamente.
+C10 | EÓLICA - Preencher os itens 2 (inversor) e 3 (fonte). Preencher conforme a quantidade de geradores e inversores.
+C11 | No item 2, existem espaços para até 10 inversores. Cada linha corresponde as informações de 1 inversor, preencher todas as células, exceto a célula da linha
+C12 | TOTAL, pois está célula é calculada automaticamente.
+C13 | No item 3, existem espaços para até 10 geradores. Cada linha corresponde as informações de 1 gerador, preencher cada célula, exceto as células da linha
+C14 | TOTAL, pois estas células são calculadas automaticamente.
+C15 | HIDRÁULICA - Preencher o item 4, conforme a quantidade de geradores. Cada linha corresponde a 1 gerador, preencher cada célula, exceto as células da coluna
+C16 | POTENCIA DO GERADOR e as da linha TOTAL, pois estas células são calculadas automaticamente
+C17 | BIOMASSA, COGERAÇÃO E OUTROS - Preencher o item 5. Preencher todas as células, exceto a célula correspondente a POTÊNCIA MÁXIMA EM REGIME
+C18 | CONTINUO, pois esta células é calculada automaticamente a partir das informações de POTÊNCIA NOMINAL DA PLACA (KVA) e FATOR DE POTÊNCIA
+B19 | 2º)
+C19 | Preencher a GUIA 1, obrigatoriamente todos os campos destacados em vermelho. Quando os itens em vermelho forem preenchidos, a tarja vermelha irá
+C20 | desaparecer.
+C21 | Preecher o item 1 DADOS CADASTRAIS DA UNIDADE CONSUMIDORA. Nos campos selecionáveis devem ser selecionadas as informações que se aplicam a UC.
+C22 | Preecher o item 2 DADOS DO RESPONSÁVEL TÉCNICOS.
+C23 | Preecher o item 3 CARACTERÍSTICAS DA MINIGERAÇÃO DISTRIBUÍDA.
+C24 | Selecionar o TIPO DE GERAÇÃO (SOLAR, EÓLICO, BIOMASSA, COGERAÇÃO QUALIFICADA, etc. Se for necessário especificar a fonte primária
+C25 | Selecionar o ENQUADRAMENTO DA MICRO (compensação local, autoconsumo remoto, geração compartilhada ou EMUC)
+C26 | Preecher o campo DATA DE INÍCIO DA OPERAÇÃO.
+C27 | Todos os demais campo deste item são calculados automaticamente, desde que a GUIA 0 e o itens anteriores da GUIA 1 sejam preenchidos corretamente
+B28 | 3º)
+C28 | Preencher a GUIA 2, apenas do casos de AUTOCONSUMO REMOTO, GERAÇÃO COMPARTILHADA E EMPREENDIMENTO DE MÚLTIPLAS
+B30 | OBS: Nos campos selecionáveis, caso o preenchimento vermelho não desapareça, clicar duas vezes ou selecionar outro valor e voltar para o valor desejado
+
+--- SHEET: 0 ---
+C3 | Informações das Unidades Geradoras (UG): (PREENCHER CONFORME O TIPO DE FONTE DE GERAÇÃO)
+C5 | 1. Solar Fotovoltaica
+C6 | Item
+D6 | Potência do Módulo (W)
+H6 | Quantidade
+K6 | Potência de Pico (kWp):
+P6 | Área do arranjo (m²):
+T6 | Fabricante(s) dos Módulos
+AA6 | Modelo
+C7 | 1
+D7 | 700
+H7 | 10
+K7 | =IFERROR((D7*H7)/1000,"")
+P7 | 30
+T7 | HONOR
+AA7 | HY-M12/132G
+C8 | 2
+K8 | =IFERROR((D8*H8)/1000,"")
+C9 | 3
+K9 | =IFERROR((D9*H9)/1000,"")
+C10 | 4
+K10 | =IFERROR((D10*H10)/1000,"")
+C11 | 5
+K11 | =IFERROR((D11*H11)/1000,"")
+C12 | 6
+K12 | =IFERROR((D12*H12)/1000,"")
+C13 | 7
+K13 | =IFERROR((D13*H13)/1000,"")
+C14 | 8
+K14 | =IFERROR((D14*H14)/1000,"")
+C15 | 9
+K15 | =IFERROR((D15*H15)/1000,"")
+C16 | 10
+K16 | =IFERROR((D16*H16)/1000,"")
+C17 | TOTAL
+H17 | =IFERROR(SUM(H7:J16),"")
+K17 | =IFERROR(SUM(K7:O16),"")
+P17 | =IFERROR(SUM(P7:S16),"")
+C18 | Obs: Célula fotovoltaica é a unidade básica, módulo é o conjunto de células e arranjo é o agrupamento de módulos, o gerador
+C20 | 2. Dados dos Inversores
+C21 | Item
+D21 | Fabricante*
+H21 | Modelo*
+L21 | Potência Nominal (kW)
+P21 | Faixa de tensão de operação (V)
+T21 | Corrente Nominal (A)
+W21 | Fator de Potência
+Z21 | Rendimento (%)
+AC21 | DHT de Corrente (%)
+C22 | 1
+D22 | FOXESS
+H22 | Q1-2500-E
+L22 | 2.5
+P22 | 220
+T22 | 20
+W22 | >0.99
+Z22 | 95.5
+C23 | 2
+D23 | FOXESS
+H23 | Q1-2500-E
+L23 | 2.5
+P23 | 220
+T23 | 20
+W23 | >0.99
+Z23 | 95.5
+C24 | 3
+D24 | FOXESS
+H24 | Q1-2500-E
+L24 | 2.5
+P24 | 220
+T24 | 20
+W24 | >0.99
+Z24 | 95.5
+C25 | 4
+C26 | 5
+C27 | 6
+C28 | 7
+C29 | 8
+C30 | 9
+C31 | 10
+C32 | 11
+C33 | 12
+C34 | 13
+C35 | 14
+C36 | 15
+C37 | 16
+C38 | 17
+C39 | 18
+C40 | 19
+C41 | 20
+C42 | 21
+C43 | 22
+C44 | 23
+C45 | 24
+C46 | 25
+C47 | 26
+C48 | 27
+C49 | 28
+C50 | 29
+C51 | 30
+C52 | TOTAL
+L52 | =SUM(L22:O51)
+C53 | Obs: Unidades Geradoras Fotovoltaiscas e Eólicas
+C55 | 3. Eólica
+C56 | Item
+D56 | Fabricante/Modelo
+F56 | Eixo do rotor (horizontal/ vertical)*
+H56 | Altura Máxima da Pá (m)*
+J56 | Diâmetro do rotor (m)
+L56 | Controle de Potência (1)
+N56 | Velocidade de rotação nominal / Sobrevelocidade máxima (rpm)
+P56 | Velocidade do vento (m/s)
+V56 | Potência Gerada (kW)
+AB56 | Momento de Inércia da Massa Girante   MD2/4 (kg.m2)
+AD56 | Documento de certificação da turbina (2)
+P57 | Entrada em serviço          (cut-in)
+S57 | Saída de seviço       (cut-out)
+V57 | Entrada em serviço     (cut-in)
+Y57 | Saída de seviço       (cut-out)
+C58 | 1
+C59 | 2
+C60 | 3
+C61 | 4
+C62 | 5
+C63 | 6
+C64 | 7
+C65 | 8
+C66 | 9
+C67 | 10
+C68 | TOTAL
+V68 | =IFERROR(SUM(V58:X67),"")
+Y68 | =IFERROR(SUM(Y58:AA67),"")
+C69 | Obs: No caso de aerogerador não convencional informar a altura máxima atingida pela estrutura.
+C70 | (1) Passo variável(Stall), Estol(pitch), Estol ativo (active stall), etc.
+C71 | (2) Data
+C73 | 4. Hidráulica
+C74 | Item
+D74 | Rio
+F74 | Bacia / SubBacia
+I74 | Tipo turbina
+L74 | Fabricante Turbina
+N74 | Potência Turbina (kVA)
+Q74 | Fabricante Gerador
+T74 | Potência do Gerador (kVA)
+X74 | Fator de Potência do Gerador
+AB74 | Potência do Gerador (kW)
+C75 | 1
+AB75 | =T75*X75
+C76 | 2
+AB76 | =T76*X76
+C77 | 3
+AB77 | =T77*X77
+C78 | TOTAL
+N78 | =IFERROR(SUM(N75:P77),"")
+T78 | =IFERROR(SUM(T75:W77),"")
+AB78 | =IFERROR(SUM(AB75:AE77),"")
+C80 | 5. Térmica (Biomassa/Solar Térmica/Cogeração)
+C81 | Informação
+H81 | Especificação
+O81 | Unidade
+Q81 | Periodicidade
+U81 | Observação
+C82 | Fabricante das Turbinas*
+C83 | Tipo de Turbina* (1)
+C84 | Fabricante/Modelo do Gerador
+C85 | Potência Nominal de Placa
+O85 | kVA
+C86 | Potência Máxima em Regime Contínuo
+H86 | =H85*H94
+O86 | kW
+C87 | Corrente Nominal
+O87 | A
+C88 | Tensão Nominal
+O88 | kV
+C89 | Frequência Nominal
+O89 | Hz
+C90 | Velocidade Nominal
+O90 | rpm
+C91 | Número de fases
+C92 | Tipo e Ligação (2)
+C93 | Número de pólos
+C94 | Fator de Potência Máximo* (3)
+C95 | (1) G/V/O
+C96 | (2) Y ou Δ
+C97 | (3) Sobre-excitado ou Sub-excitado
+
+--- SHEET: 1 ---
+AI2 | 20
+F3 | NT.00020.EQTL.Normas e Qualidade
+ANEXO I - Formulário de Solicitação de Orçamento de Microgeração Distribuída Grupo B
+AI3 | 25
+AJ3 | MONOFÁSICO
+AK3 | AL
+AL3 | Residencial
+AM3 | Preencher as coordenadas ponto de entrega do acessante em UTM Fuso 21, 22 ou 23
+AN3 | LIGAÇÃO NOVA DE UNIDADE CONSUMIDORA COM GERAÇÃO DISTRIBUÍDA
+AI4 | 30
+AJ4 | BIFÁSICO
+AK4 | AP
+AL4 | Industrial
+AM4 | Preencher as coordenadas do ponto de entrega do acessante em UTM Fuso 23
+AN4 | CONEXÃO DE GD EM UNIDADE CONSUMIDORA EXISTENTE SEM AUMENTO DE POTÊNCIA DISPONIBILIZADA (ver item abaixo)
+AI5 | 32
+AJ5 | TRIFÁSICO
+AK5 | GO
+AL5 | Comércio, serviços e outras atividades
+AM5 | Preencher as coordenadas do ponto de entrega do acessante em UTM Fuso 23 ou 24
+AN5 | CONEXÃO DE GD EM UNIDADE CONSUMIDORA EXISTENTE COM AUMENTO DE POTÊNCIA DISPONIBILIZADA (ver item abaixo)
+AI6 | 40
+AK6 | MA
+AL6 | Rural
+AM6 | Preencher as coordenadas do ponto de entrega do acessante em UTM Fuso 24 ou 25
+AN6 | AUMENTO DA POTÊNCIA DE GERAÇÃO EM UC COM GD EXISTENTE SEM AUMENTO DE POTÊNCIA DISPONIBILIZADA (ver item abaixo)
+C7 | 1. Identificação e Dados Cadastrais da Unidade Consumidora - PREENCHER, OBRIGATORIAMENTE, TODOS OS CAMPOS NA COR VERMELHA
+AI7 | 50
+AJ7 | SIM
+AK7 | PA
+AL7 | Poder Público
+AM7 | Preencher as coordenadas ponto de entrega do acessante em UTM Fuso 21 ou 22
+AN7 | AUMENTO DA POTÊNCIA DE GERAÇÃO EM UC COM GD EXISTENTE COM AUMENTO DE POTÊNCIA DISPONIBILIZADA (ver item abaixo)
+AI8 | 60
+AJ8 | NÃO
+AK8 | PI
+AL8 | Iluminação Pública
+AM8 | Preencher as coordenadas ponto de entrega do acessante em UTM Fuso 22
+C9 | Nome do Cliente / Razão Social (Titular da Unidade Consumidora)
+R9 | CPF/CNPJ
+Y9 | RG
+AC9 | 1154690
+AI9 | 63
+AK9 | RS
+AL9 | Serviço Público
+AM9 | Preencher as coordenadas do ponto de entrega do acessante em UTM Fuso 22 ou 23
+C10 | ADÃO MARCELINO DA SILVA
+R10 | 269.191.501-82
+Y10 | DATA EXPEDIÇÃO
+AC10 | 2023-11-30 00:00:00
+AI10 | 70
+AJ10 | 127
+AL10 | Consumo próprio
+AI11 | 80
+AJ11 | 220
+AM11 | SOLAR FOTOVOLTAICA
+C12 | Endereço
+R12 | Contatos telefônicos
+AI12 | 100
+AJ12 | 380
+AL12 | AUTOCONSUMO LOCAL
+AM12 | EÓLICA
+C13 | RUA DA UNIÃO, QD. 171, LT. 15, S/N, JARDIM NOVA ESPERANÇA
+R13 | Celular
+T13 | 62 8471-8268
+Z13 | Fixo
+AI13 | 125
+AJ13 | AÉREO
+AL13 | AUTOCONSUMO REMOTO
+AM13 | HIDRÁULICA
+AN13 | 1Ø 127
+AI14 | 150
+AJ14 | SUBTERRÂNEO
+AL14 | GERAÇÃO COMPARTILHADA
+AM14 | BIOMASSA (especificar ao lado o tipo de fonte primária)
+AN14 | 2Ø 220
+C15 | CEP:
+D15 | 74465-460
+G15 | Munícipio
+I15 | Goiânia
+N15 | UF (selecionar)
+Q15 | GO
+T15 | E-mail
+V15 | contato@fotonengenharia.com
+AI15 | 175
+AL15 | EMPREENDIMENTO DE MÚLTIPLAS UNIDADES CONSUMIDORAS
+AM15 | COGERAÇÃO QUALIFICADA
+AN15 | 3Ø 220
+AI16 | 200
+AM16 | HÍBRIDO (indicar potência total ao lado)
+AN16 | 1Ø 220
+C17 | Tipo de orçamento desejado
+F17 | Orçamento de Conexão
+N17 | =IF(F17="Orçamento Estimado", "Potência Geração","")
+R17 | =IF(F17="Orçamento Estimado", "kW","")
+T17 | Conta Contrato (Se UC existente)
+Z17 | 11517621
+AM17 | OUTRAS (especificar ao lado)
+AN17 | 2Ø 380
+AN18 | 3Ø 380
+C19 | Tipo de Solicitação (selecionar)
+G19 | CONEXÃO DE GD EM UNIDADE CONSUMIDORA EXISTENTE SEM AUMENTO DE POTÊNCIA DISPONIBILIZADA (ver item abaixo)
+AM19 | EMPREGANDO MÁQUINA SÍNCRONA SEM CONVERSOR
+AM20 | EMPREGANDO CONVERSOR ELETRÔNICO/INVERSOR
+C21 | =IF(G19="","",IF(G19="LIGAÇÃO NOVA DE UNIDADE CONSUMIDORA COM GERAÇÃO DISTRIBUÍDA",0,IF(G19="CONEXÃO DE GD EM UNIDADE CONSUMIDORA EXISTENTE COM AUMENTO DE POTÊNCIA DISPONIBILIZADA (ver item abaixo)","INFORMAR O NÚMERO DA CONTA CONTRATO E PREENCHER O FORMULÁRIO DE TROCA PADRÃO NO ANEXO IV",IF(G19="CONEXÃO DE GD EM UNIDADE CONSUMIDORA EXISTENTE SEM AUMENTO DE POTÊNCIA DISPONIBILIZADA (ver item abaixo)","INFORMAR O NÚMERO DA CONTA CONTRATO",IF(G19="AUMENTO DA POTÊNCIA DE GERAÇÃO EM UC COM GD EXISTENTE SEM AUMENTO DE POTÊNCIA DISPONIBILIZADA (ver item abaixo)","INFORMAR NÚMERO DA CONTA CONTRATO E POTÊNCIA DA GD EXISTENTE",IF(G19="AUMENTO DA POTÊNCIA DE GERAÇÃO EM UC COM GD EXISTENTE COM AUMENTO DE POTÊNCIA DISPONIBILIZADA (ver item abaixo)","INFORMAR NÚMERO DA CONTA CONTRATO, POTÊNCIA DA GD EXISTENTE E PREENCHER ANEXO IV",""))))))
+W21 | =IF(OR(G19="AUMENTO DA POTÊNCIA DE GERAÇÃO EM UC COM GD EXISTENTE SEM AUMENTO DE POTÊNCIA DISPONIBILIZADA (ver item abaixo)",G19="AUMENTO DA POTÊNCIA DE GERAÇÃO EM UC COM GD EXISTENTE COM AUMENTO DE POTÊNCIA DISPONIBILIZADA (ver item abaixo)"), "Potência de Geração Existente","")
+AE21 | =IF(OR(G19="AUMENTO DA POTÊNCIA DE GERAÇÃO EM UC COM GD EXISTENTE SEM AUMENTO DE POTÊNCIA DISPONIBILIZADA (ver item abaixo)",G19="AUMENTO DA POTÊNCIA DE GERAÇÃO EM UC COM GD EXISTENTE COM AUMENTO DE POTÊNCIA DISPONIBILIZADA (ver item abaixo)"), "kW","")
+AM21 | MISTA
+AN21 | Orçamento de Conexão
+AM22 | OUTRA (especificar ao lado)
+AN22 | Orçamento Estimado
+C23 | Possui Cargas Especiais?
+F23 | NÃO
+H23 | Detalhar - Cargas especiais
+C25 | Ramo de Atividade (Descrição)
+G25 | Residencial
+C27 | Classe (selecionar)
+F27 | Residencial
+O27 | Tipo de Ligação (selecionar)
+T27 | MONOFÁSICO
+X27 | Tensão de Atendimento da UC
+AC27 | 220
+AE27 | V
+C29 | Carga Declarada da UC
+F29 | 7
+H29 | kW
+J29 | Disjuntor de Entrada da UC (selecionar)
+P29 | 40
+R29 | A
+T29 | Potência Disponibilizada (PD) para a UC
+AB29 | =IF(OR(T27="",AC27="",P29=""),"",IF(OR(Q15="PA",Q15="AP",Q15="RS"),IF(AND(T27="MONOFÁSICO",AC27=127),IF(AND(P29<80,P29<>30,P29<>32),ROUNDUP(AC27*P29*0.92/1000,0),IF(OR(P29=30,P29=32),3.5,IF(P29=80,10,""))),IF(AND(T27="BIFÁSICO",AC27=220),IF(AND(P29>=50,P29<70),ROUNDDOWN(AC27*P29*0.92/1000,0),IF(P29=70,15,"")),IF(AND(T27="TRIFÁSICO",AC27=220),IF(AND(P29>=50,P29<>125,P29<200),ROUNDDOWN(AC27*P29*SQRT(3)*0.92/1000,0),IF(P29=40,15,IF(P29=125,44,IF(P29=200,75,"")))),IF(Q15="RS",IF(AND(T27="MONOFÁSICO",AC27=220),IF(P29<63,ROUNDDOWN(AC27*P29*0.92/1000,0),IF(P29=63,12,"")),IF(AND(T27="BIFÁSICO",AC27=380),IF(P29<50,ROUNDUP(AC27*P29*0.92/1000,0),IF(P29=50,19,"")),IF(AND(T27="TRIFÁSICO",AC27=380),IF(AND(P29>=25,P29<125),ROUNDDOWN(AC27*P29*SQRT(3)*0.92/1000,0),IF(P29=125,75,"")),""))),"")))),IF(OR(Q15="MA",Q15="PI",Q15="AL",Q15="GO"),IF(AND(T27="MONOFÁSICO",AC27=220),IF(P29<63,ROUNDDOWN(AC27*P29*0.92/1000,0),IF(P29=63,12,"")),IF(AND(T27="BIFÁSICO",Q15="GO",AC27=380),IF(P29<50,ROUNDUP(AC27*P29*0.92/1000,0),IF(P29=50,19,"")),IF(AND(T27="TRIFÁSICO",AC27=380),IF(AND(P29>=20,P29<125),ROUNDDOWN(AC27*P29*SQRT(3)*0.92/1000,0),IF(P29=125,75,"")),""))),"")))
+AE29 | kW
+C31 | Tipo de Ramal (selecionar)
+F31 | AÉREO
+J31 | Nº de identificação do poste ou transformador mais próximo
+C33 | =IF(Q15="PA",AM3,IF(Q15="MA",AM4,IF(Q15="PI",AM5,IF(Q15="AL",AM6,IF(Q15="RS",AM7,IF(Q15="AP",AM8,IF(Q15="GO",AM9,"O conteúdo deste campo será exibido quando for selecionada a UF")))))))
+O33 | X =
+P33 | -16.641349
+X33 | Y =
+Y33 | -49.326792
+C35 | 2. Dados Cadastrais do Responsável Técnico
+C37 | Nome Completo
+M37 | Titulo Profissional
+W37 | Registro Profissional
+C38 | Fúlvio Ferreira Borges
+M38 | TÉCNICO EM ELETROTÉCNICA
+W38 | Nº
+Y38 | 2012721113
+AD38 | UF
+AE38 | GO
+C40 | E-mail
+M40 | Telefone Fixo
+S40 | Telefone Celular
+Z40 | Fax
+C41 | fulvio@fotonengenharia.com
+M41 | 624101-1870
+S41 | 6298556-0258
+C43 | Endereço de Correspondência
+M43 | Bairro
+P43 | Setor Sudoeste
+Z43 | UF:
+AB43 | GO
+C44 | Rua C-52, Qd. 57, Lt. 02
+M44 | Município
+P44 | Goiânia
+Z44 | CEP:
+AB44 | 74305-310
+C46 | 3. Características da Microgeração Distribuída
+C47 | Dados Gerais da Central Geradora
+C49 | Tipo de Fonte Primária (selecionar)
+G49 | SOLAR FOTOVOLTAICA
+Q49 | Especificar se necessário
+C51 | Tipo de Geração (selecionar)
+G51 | EMPREGANDO CONVERSOR ELETRÔNICO/INVERSOR
+Q51 | Especificar se necessário
+C53 | Modalidade de Compensação (selecionar)
+I53 | AUTOCONSUMO REMOTO
+W53 | Potência Geração do Orçamento
+AC53 | =IF(G49="","",IF(G49="SOLAR FOTOVOLTAICA",IF('0'!L52<='0'!K17,'0'!L52,'0'!K17),IF(G49="EÓLICA",IF('0'!L52<='0'!V68,'0'!L52,'0'!V68),IF(G49="HIDRÁULICA",'0'!AB78,IF(G49="BIOMASSA (especificar ao lado o tipo de fonte primária)",'0'!H86,IF(G49="COGERAÇÃO QUALIFICADA",'0'!H86,IF(OR(G49="OUTRAS (especificar ao lado)",G49="HÍBRIDO (indicar potência total ao lado)"),'0'!H86,"")))))))
+AE53 | kW
+C55 | =IF(I53="","",IF(I53="AUTOCONSUMO LOCAL","NÃO É NECESSÁRIO PREENCHER A LISTA DE RATEIO","PREENCHER LISTA DE RATEIO DE CLIENTES NA GUIA 2 (OPCIONAL)"))
+W55 | Potência Geração Total da UC(PGT)
+AC55 | =IFERROR(AC21+AC53,"")
+AE55 | kW
+C57 | Armazenamento (se houver)
+W57 | Potência Máxima Injetável (se aplicável)
+AE57 | kW
+Q59 | Data Início de Operação
+U59 | 2025-08-22 00:00:00
+Y59 | =IF(OR(AB29="",AC55=""),"",IF(AC55<=75,IF(AC55<=AB29,"OK: PGT ≤ PD","NOK: PGT > PD"),"PGT ACIMA DO LIMITE DO GRUPO B"))
+C61 | 4. Documentos necessários que devem ser anexados à Solicitação de Orçamento de Conexão:
+C63 | Descrição
+V63 | Observações
+C64 | 1. Documento de responsabilidade técnica (projeto e execução) do conselho profissional competente, que identifique o número do registro válido e o nome do responsável técnico, o local da obra ou serviço e as atividades profissionais desenvolvidas, caso seja exigível na legislação específica e na forma prevista nessa legislação
+C65 | 2. Indicação do local do padrão ou da subestação de entrada no imóvel, exclusivamente nos casos em que ainda não estiverem instalados
+C66 | 3. Diagrama unifilar e de blocos do sistema de geração, carga e proteção
+C67 | 4. Memorial Técnico Descritivo da instalação (Conforme Modelo do ANEXO III - MODELO DE MEMORIAL TÉCNICO DESCRITIVO)
+C68 | 5. Relatório de ensaio, em língua portuguesa, atestando a conformidade de todos os conversores de potência para a tensão nominal de conexão com a rede, sempre que houver a utilização de conversores.
+C69 | 6. Dados necessários ao registro da central geradora distribuída conforme disponível no site da ANEEL.
+C70 | 7. Lista de unidades consumidoras participantes do sistema de compensação (se houver), indicando o percentual ou a ordem de utilização dos excedentes. (PLANILHA NA GUIA 2)
+V70 | Para autoconsumo remoto, geração compartilhada e empreendimento de múltiplas unidades consumidoras
+C71 | 8. Cópia de instrumento jurídico que comprove a participação dos integrantes para os casos de múltiplas unidades consumidoras e geração compartilhada. (Caso aplicável)
+V71 | Apenas para os casos de empreendimentos com múltiplas unidades consumidoras e geração compartilhada.
+C72 | 9. Documento que comprove o reconhecimento pela ANEEL, da cogeração qualificada (se houver)
+V72 | Apenas para cogeração qualificada
+C73 | 10. Dados de segurança das barragens no caso do uso de sistemas com fontes hídricas, conforme Resolução Normativa nº 696/2015. (Caso aplicável)
+C74 | 11. Para centrais fotovoltaicas enquadradas como despacháveis, comprovação de que o sistema de armazenamento atende o disposto no art. 655-B da Resolução Normativa nº 1.000/2021. (Caso aplicável)
+C75 | 12. Documento com data que comprove a propriedade ou posse do imóvel onde será implantada a unidade consumidora com microgeração ou minigeração distribuída, e que, no caso de unidade flutuante, deve ser complementado por autorização, licença ou documento equivalente exigível pelas autoridades competentes para a instalação flutuante, observada a possibilidade de dispensa prevista no §5º do art. 67 da Resolução Normativa nº 1.000/2021.
+V75 | Apenas nos casos de Ligação Nova de UC com Microgeração ou Alteração da Potência Disponibilizada de UC Existente
+C76 | 13. Formulário de Troca de Padrão ( de monofásico para bifásico ou trifásico, de bifásico para trifásico, de trifásico para bifásico ou monofásico, de bifásico para monofásico)  (Conforme ANEXO IV - FORMULÁRIO DE TROCA DE PADRÃO)
+V76 | Apenas no caso de unidade consumidora existente com alteração de potência disponibilizada que implique em troca de padrão
+C77 | 14. Autorização de uso de área comum em condomínio (quando necessário, conforme observação)
+V77 | Quando uma UC individualmente construir uma central geradora utilizando a área comum do condomínio
+C78 | 15. Procuração Autenticada (quando necesário, conforme observação)
+V78 | Quando a solicitação for feita por terceiros
+C79 | 16. Apresentação de licença ou declaração emitida pelo órgão competente caso as instalações ou a extensão de rede de responsabilidade do consumidor e demais usuários ocuparem áreas protegidas pela legislação, tais como unidades de conservação, reservas legais, áreas de preservação permanente, territórios indígenas e quilombolas. (Caso aplicável)
+C81 | 5. Documentos necessários que devem ser anexados à Solicitação de Orçamento Estimado:
+C83 | Para solicitar orçamento estimado é necessário preencher apenas os dados básicos da unidade consumidora, a tensão de conexão e indicação da potência de geração no campo que surgirá ao lado do tipo de orçamento.
+C84 | Caso o orçamento estimado seja solicitado para uma localização onde ainda não exista unidade consumidora, é necessário anexar à solicitação planta de situação conforme modelo da norma NT.00020.EQTL.
+C85 | Devem ser enviados também documentos de identificação do consumidor e, caso existam, procurações e documentações dos representantes legais, conforme Tabela 3 da norma NT.00020.EQTL.
+C87 | 6. Solicitações e Declarações
+C89 | Solicito que a contagem do prazo para realização da vistoria pela CONCESSIONÁRIA, conforme art. 68 da Resolução Normativa nº 1.000/2021, inicie-se somente após minha solicitação.
+AD89 | SIM
+C90 | Autorizo a distribuidora a entregar junto com o orçamento de conexão os contratos e o documento ou meio para pagamento de custos de minha responsabilidade.
+AD90 | SIM
+C91 | Declaro que as instalações internas da minha unidade consumidora, incluindo a geração distribuída, atendem às normas e padrões da distribuidora, às normas da Associação Brasileira de Normas Técnica - ABNT e às normas dos órgãos oficiais competentes, e ao art. 8º da Lei nº 9.074, de 1995, naquilo que for aplicável.
+AD91 | SIM
+C92 | Solicito dispensa da análise de inversão de fluxo por enquadramento no art. 73-A da REN 1000, na seguinte regra:
+C93 | Não injeção na rede de distribuição de energia elétrica (“Grid Zero”)
+AD93 | SIM
+C94 | Enquadramento nos critérios de gratuidade da REN 1.000/2021 e potência de geração compatível com o consumo no horário de geração
+AD94 | SIM
+C95 | Modalidade autoconsumo local, com potência instalada de geração igual ou inferior a 7,5 kW, observado o item 7
+AD95 | SIM
+C96 | Declaro, para todos os fins, que todas as informações prestadas neste documento são verdadeiras.
+AD96 | SIM
+C98 | 7. Termo de Aceite das condições para afastamento da análise de inversão de fluxo (Opcional)
+C100 | Solicito o afastamento da análise de inversão de fluxo, nos termos do inciso III do caput do art. 73-A da Resolução Normativa nº 1.000/2021, e declaro estar ciente de que:
+1) a unidade consumidora será enquadrada na modalidade autoconsumo local;
+2) fica vedada, em qualquer hipótese, a alocação ou realocação de excedentes ou de créditos de energia em unidade consumidora distinta de onde ocorreu a geração de energia elétrica, afastando-se as disposições de que trata o art. 655-M da Resolução Normativa nº 1.000/2021; e
+3) para alteração de enquadramento da modalidade da microgeração deverá ser encerrado o contrato e solicitado novo orçamento de conexão, vedada a aplicação do art. 655-M.
+Declaro também reconhecer que essa opção é irrevogável e irretratável, implicando no meu dever de observar o que estabelece o art. 73-A da referida Resolução.
+C101 | Local e Data:
+E101 | 22/07/2025 - Goiânia - GO
+C102 | Assinatura:
+C104 | 8. Este formulário deve ser preenchido e encaminhado aos canais de atendimento Corporativo da Concessionária
+C105 | ALAGOAS - Sede de regionais (Maceio,Arapiraca, Matriz de Camaragibe e Santana
+O105 | Eu, acessante identificado neste formulário, venho por meio deste instrumento, solicitar o acesso para microgeração distribuída, fornecendo meus dados cadastrais assim como as documentos necessários, em conformidade com as normas e resoluções aplicáveis.
+C106 | do Ipanema)
+C107 | AMAPÁ - Sede de regionais (Macapá)
+C108 | GOIÁS - Sede de regionais (Goiânia, Luziânia, Anápolis, Rio Verde e Iporá)
+C109 | MARANHÃO - Sede de regionais (São Luís, Imperatriz, Timon, Balsas e Bacabal)
+O109 | Goiânia - GO
+U109 | 2025-07-22 00:00:00
+C110 | PARÁ - Sede de regionais (Belém, Castanhal, Marabá, Santarém e Altamira)
+C111 | PIAUÍ - Sede de regionais (Teresina, Parnaíba, Picos, Bom Jesus e Floriano)
+C112 | RIO GRANDE DO SUL - Sede de regionais (Porto Alegre, Osório e Pelotas)
+C114 | Em caso de dúvidas entrar em contato com os canais de atendimento disponibilizados na norma NT.00020.EQTL.Normas e Qualidade.
+O115 | Local
+U115 | Data
+Z115 | Assinatura do Responsável
+B117 | GERÊNCIA CORPORATIVA DE NORMAS E QUALIDADE. NT.00020.EQTL.Normas e Qualidade ANEXO I - FORMULÁRIO DE SOLICITAÇÃO DE ORÇAMENTO DE MICROGERAÇÃO DISTRIBUÍDA GRUPO B REVISÃO 05. DATA: 13/01/2025.
+
+--- SHEET: 2 ---
+D2 | LISTA DE RATEIO PARA AS UNIDADES CONSUMIDORAS PARTICIPANTES DO SISTEMA DE COMPENSAÇÃO
+(Autoconsumo Remoto, Geração Compartilhada e EMUC)
+B3 | Conta Contrato da UC geradora
+G3 | 11517621
+I3 | Enquadramento
+K3 | Geração Compartilhada
+P3 | Autoconsumo Remoto
+B4 | Local da solicitação
+E4 | RUA DA UNIÃO, QD. 171, LT. 15, S/N, JARDIM NOVA ESPERANÇA, GOIANIA - GO
+L4 | Data solicitação
+M4 | 2025-07-22 00:00:00
+P4 | Geração Compartilhada
+B5 | Forma de alocação dos créditos
+G5 | Percentual do Excedente
+I5 | =IF(G5="","",IF(G5="Ordem de Prioridade","Não preencher as porcentagens, será considerada a ordem","Prencher as porcentagens"))
+P5 | Empreendimento de Múltiplas Unidades
+B6 | =IF(G5="Ordem de Prioridade", "Indicar unidade consumidora que receberá eventual excedente de energia (opcional)","")
+B8 | Ordem
+C8 | % kWh
+D8 | Conta Contrato
+G8 | Classe de Consumo
+J8 | ENDEREÇO
+B9 | 1
+D9 | 11517621
+G9 | Residencial
+J9 | RUA DA UNIÃO, QD. 171, LT. 15, S/N, JARDIM NOVA ESPERANÇA, GOIANIA - GO
+B10 | 2
+C10 | 100
+D10 | 12996774
+G10 | Residencial
+J10 | RUA JC-51, QD. 100, LT. 24, JARDIM CURITIBA III, GOIANIA - GO
+P10 | Residencial
+B11 | 3
+P11 | Industrial
+B12 | 4
+P12 | Comércio, serviços e outras atividades
+B13 | 5
+P13 | Rural
+B14 | 6
+P14 | Poder Público
+B15 | 7
+P15 | Iluminação Pública
+B16 | 8
+P16 | Serviço Público
+B17 | 9
+P17 | Consumo próprio
+B18 | 10
+B19 | 11
+P19 | Ordem de Prioridade
+B20 | 12
+P20 | Percentual do Excedente
+B21 | 13
+B22 | 14
+B23 | 15
+B24 | 16
+B25 | 17
+B26 | 18
+B27 | 19
+B28 | 20
+B29 | 21
+B30 | 22
+B31 | 23
+B32 | 24
+B33 | 25
+B34 | 26
+B35 | 27
+B36 | 28
+B37 | 29
+B38 | 30
+B39 | 31
+B40 | 32
+B41 | 33
+B42 | 34
+B43 | 35
+B44 | 36
+B45 | 37
+B46 | 38
+B47 | 39
+B48 | 40
+B49 | 41
+B50 | 42
+B51 | 43
+B52 | 44
+B53 | 45
+B54 | 46
+B55 | 47
+B56 | 48
+B57 | 49
+B58 | 50
+B59 | 51
+B60 | 52
+B61 | 53
+B62 | 54
+B63 | 55
+B64 | 56
+B65 | 57
+B66 | 58
+B67 | 59
+B68 | 60
+B69 | TOTAL
+C69 | =IF(G5="","",IF(G5="Percentual do Excedente", SUM(C9:C68)/100, "Definir ordem de prioridade"))
+
+--- SHEET: FONTES ---
+A2 | Origem
+C2 | Fontes
+A3 | Biomassa
+B3 | Floresta
+C3 | Biogás - Floresta
+C4 | Carvão Vegetal
+C5 | Gás de Alto Forno - Biomassa
+C6 | Lenha
+C7 | Licor Negro
+C8 | Resíduos de Madeira
+B9 | Resíduos sólidos urbanos
+C9 | Biogás - RU
+B10 | Resíduos animais
+C10 | Biogás - RA
+B11 | Biocombustíveis líquidos
+C11 | Etanol
+C12 | Óleos vegetais
+B13 | Agroindustriais
+C13 | Bagaço de Cana de Açúcar
+C14 | Biogás-AGR
+C15 | Capim Elefante
+C16 | Casca de Arroz
+A17 | Eólica
+B17 | Cinética do vento
+C17 | Cinética do vento
+A18 | Fóssil
+B18 | Petróleo
+C18 | Gás de Alto Forno - PE
+C19 | Gás de Refinaria
+C20 | Óleo Combustível
+C21 | Óleo Diesel
+C22 | Outros Energéticos de Petróleo
+B23 | Carvão mineral
+C23 | Calor de Processo - CM
+C24 | Carvão Mineral
+C25 | Gás de Alto Forno - CM
+B26 | Gás natural
+C26 | Calor de Processo - GN
+C27 | Gás Natural
+B28 | Outros Fósseis
+C28 | Calor de Processo - OF
+C29 | Turfa
+C30 | Xisto
+A31 | Hídrica
+B31 | Potencial hidráulico
+C31 | Potencial hidráulico
+A32 | Nuclear
+B32 | Urânio
+C32 | Urânio
+A33 | Solar
+B33 | Radiação solar
+C33 | Radiação solar
+A34 | Undi-Elétrica
+B34 | Cinética da água
+C34 | Cinética da água

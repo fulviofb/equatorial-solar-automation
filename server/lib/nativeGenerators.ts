@@ -4,9 +4,10 @@ import ExcelJS from 'exceljs';
 import fs from 'fs';
 import path from 'path';
 import AdmZip from 'adm-zip';
+import { spawn } from 'child_process';
 
 // Configurações
-const BASE_DIR = path.resolve(process.cwd(), 'server', 'python_modules');
+const BASE_DIR = path.resolve(process.cwd(), 'server', 'resources', 'templates');
 const TEMPLATE_WORD = path.join(BASE_DIR, "TEMPLATE_MEMORIAL_CLEAN.docx");
 const TEMPLATE_EXCEL = path.join(BASE_DIR, "TEMPLATE_ANEXO_I.xlsx");
 const OUTPUT_DIR_WORD = path.join(BASE_DIR, "Projetos_Gerados_Word");
@@ -191,144 +192,111 @@ export const NativeGenerator = {
 
     async generateExcel(data: any): Promise<{ success: boolean; filePath?: string; error?: string }> {
         try {
-            console.log(`[NativeGenerator] Gerando Excel com template: ${TEMPLATE_EXCEL}`);
+            console.log(`[NativeGenerator] Gerando Excel nativamente Node.js (ExcelJS) para: ${data.nome_cliente}`);
+
+            if (!fs.existsSync(TEMPLATE_EXCEL)) {
+                throw new Error(`Template não encontrado: ${TEMPLATE_EXCEL}`);
+            }
 
             const workbook = new ExcelJS.Workbook();
             await workbook.xlsx.readFile(TEMPLATE_EXCEL);
 
-            // --- ABA 0: MÓDULOS ---
-            const ws0 = workbook.getWorksheet('0');
-            if (!ws0) throw new Error("Worksheet '0' not found");
+            // Aba 0: Unidades Geradoras
+            const ws0 = workbook.worksheets[0];
+            if (ws0) {
+                // Modules (Rows 7-16)
+                if (data.modules && Array.isArray(data.modules)) {
+                    data.modules.forEach((mod: any, idx: number) => {
+                        if (idx >= 10) return;
+                        const row = 7 + idx;
+                        ws0.getCell(`C${row}`).value = idx + 1;
+                        ws0.getCell(`D${row}`).value = Number(mod.potencia || 0);
+                        ws0.getCell(`H${row}`).value = Number(mod.qtd || 0);
 
-            // Limpar células antigas (Intervalo C7:AE50)
-            const colsToClear = [3, 4, 8, 11, 16, 20, 27];
-            for (let r = 7; r <= 16; r++) { // Modules Range
-                for (const c of colsToClear) {
-                    ws0.getCell(r, c).value = null;
+                        ws0.getCell(`T${row}`).value = String(mod.fabricante || '').toUpperCase();
+                        ws0.getCell(`AA${row}`).value = String(mod.modelo || '').toUpperCase();
+                    });
                 }
-            }
-            // Clear Inverters Range (22-31)
-            const invColsToClear = [3, 4, 8, 12, 16, 20, 23, 26, 29]; // C, D, H, L, P, T, W, Z, AC
-            for (let r = 22; r <= 31; r++) {
-                for (const c of invColsToClear) {
-                    ws0.getCell(r, c).value = null;
-                }
-            }
 
-            // Preencher Módulos (Consolidated)
-            // C=Item, D=Pot, H=Qtd, K=Total, P=Area, T=Fab, AA=Modelo
-            let currentRow = 7;
-            if (data.modules) {
-                const consolidatedModules = consolidateItems(data.modules, 'module');
-                consolidatedModules.forEach((mod: any, idx: number) => {
-                    if (currentRow > 16) return; // Limit to fixed rows
+                // Inverters (Rows 22-51)
+                if (data.inverters && Array.isArray(data.inverters)) {
+                    data.inverters.forEach((inv: any, idx: number) => {
+                        if (idx >= 30) return;
+                        const row = 22 + idx;
+                        ws0.getCell(`C${row}`).value = idx + 1;
+                        ws0.getCell(`D${row}`).value = String(inv.fabricante || '').toUpperCase();
+                        ws0.getCell(`H${row}`).value = String(inv.modelo || '').toUpperCase();
+                        // Na doc original, era float(inv.get('potenciaNominal', inv.get('potencia', 0)))
+                        ws0.getCell(`L${row}`).value = Number(inv.potencia_nominal_kw || inv.potencia || 0);
 
-                    const pot = parseFloat(mod.potencia || 0);
-                    const qtd = parseInt(mod.qtd || 0);
-                    const areaUn = parseFloat(mod.area || 0);
-                    const totalKwp = (pot * qtd) / 1000;
-                    const totalArea = areaUn * qtd;
-
-                    ws0.getCell(currentRow, 3).value = idx + 1; // C
-                    ws0.getCell(currentRow, 4).value = pot;     // D
-                    ws0.getCell(currentRow, 8).value = qtd;     // H
-                    ws0.getCell(currentRow, 11).value = totalKwp; // K
-                    ws0.getCell(currentRow, 16).value = totalArea; // P
-                    ws0.getCell(currentRow, 20).value = (mod.fabricante || '').toUpperCase(); // T
-                    ws0.getCell(currentRow, 27).value = (mod.modelo || '').toUpperCase(); // AA
-
-                    currentRow++;
-                });
-            }
-
-            // Preencher Inversores (Consolidated)
-            // Range Starts 22
-            // D=Fab, H=Mod, L=Pot(kW), P=Faixa Tensao, T=Corr Nom, W=FP, Z=Rend, AC=DHT
-            let invRow = 22;
-            if (data.inverters) {
-                const consolidatedInverters = consolidateItems(data.inverters, 'inverter');
-                consolidatedInverters.forEach((inv: any, idx: number) => {
-                    if (invRow > 31) return;
-
-                    ws0.getCell(invRow, 3).value = idx + 1; // C (Item)
-                    ws0.getCell(invRow, 4).value = (inv.fabricante || '').toUpperCase(); // D
-                    ws0.getCell(invRow, 8).value = (inv.modelo || '').toUpperCase(); // H
-                    ws0.getCell(invRow, 12).value = parseFloat(inv.potencia_nominal_kw || 0); // L
-
-                    // Faixa Tensao (MPPT Min - Max) if available
-                    const mpptRange = (inv.tensao_mppt_min && inv.tensao_mppt_max) ? `${inv.tensao_mppt_min}-${inv.tensao_mppt_max}` : (inv.faixa_tensao || '');
-                    ws0.getCell(invRow, 16).value = mpptRange; // P
-
-                    ws0.getCell(invRow, 20).value = inv.corrente_ca_max || ''; // T (Corrente Nominal -> usually Max AC Current)
-                    ws0.getCell(invRow, 23).value = inv.fator_potencia || '>0.99'; // W
-                    ws0.getCell(invRow, 26).value = inv.eficiencia_max || ''; // Z
-                    ws0.getCell(invRow, 29).value = inv.thd || '<3'; // AC
-
-                    invRow++;
-                });
-            }
-
-            // --- ABA 1: DADOS CADASTRAIS ---
-            const ws1 = workbook.getWorksheet('1');
-            if (!ws1) throw new Error("Worksheet '1' not found");
-
-            // Calculate Total Inverter Power
-            let totalInverterPower = 0;
-            if (data.inverters) {
-                data.inverters.forEach((inv: any) => {
-                    const qtd = parseInt(inv.qtd || 0);
-                    const pot = parseFloat(inv.potencia_nominal_kw || 0);
-                    totalInverterPower += (pot * qtd);
-                });
-            }
-            const totalInverterPowerStr = totalInverterPower.toFixed(2).replace('.', ',');
-
-            const mapping: { [key: string]: string } = {
-                'C10': 'nome_cliente',
-                'R10': 'cpf_cnpj',
-                'AC9': 'rg',
-                'AC10': 'rg_data_emissao',
-                'C13': 'endereco',
-                'D15': 'cep',
-                'I15': 'cidade',
-                'Q15': 'uf',
-                'Z17': 'conta_contrato',
-                'F27': 'classe_uc',
-                'T27': 'tipo_ligacao',
-                'AC27': 'tensao_atendimento',
-                'F29': 'carga_declarada',
-                'H29': 'unidade_potencia',
-                'P31': 'numero_poste',
-                'C38': 'resp_tecnico_nome',
-                'M38': 'resp_tecnico_titulo',
-                'Y38': 'resp_tecnico_registro',
-                // Power Fields
-                'AC53': 'potencia_total_kw', // Potência Geração do Orçamento (Modules kWp)
-                'AC55': 'potencia_total_kw', // Potência Geração Total (Assuming New = Total)
-                'AC57': 'potencia_inversores_kw' // Potência Máxima Injetável (Total Inverters)
-            };
-
-            // Add computed fields to data object for mapping
-            data.potencia_inversores_kw = totalInverterPowerStr;
-
-            for (const [cellRef, jsonKey] of Object.entries(mapping)) {
-                let val = data[jsonKey];
-                if (val) {
-                    if (typeof val === 'string') val = val.toUpperCase();
-                    ws1.getCell(cellRef).value = val;
+                        ws0.getCell(`P${row}`).value = Number(inv.tensao || 220);
+                        ws0.getCell(`T${row}`).value = Number(inv.corrente || 0);
+                        ws0.getCell(`W${row}`).value = String(inv.fatorPotencia || '>0.99');
+                        ws0.getCell(`Z${row}`).value = Number(inv.rendimento || 97);
+                        ws0.getCell(`AC${row}`).value = String(inv.dht || '<3');
+                    });
                 }
             }
 
-            const filename = `Anexo_I_${(data.nome_cliente || 'Novo').replace(/ /g, '_')}.xlsx`;
-            const outputPath = path.join(OUTPUT_DIR_EXCEL, filename);
+            // Aba 1: Dados Cadastrais
+            const ws1 = workbook.worksheets[1];
+            if (ws1) {
+                const totalModPower = (data.modules || []).reduce((acc: number, m: any) => acc + (Number(m.potencia) * Number(m.qtd) / 1000), 0);
+                const totalInvPower = (data.inverters || []).reduce((acc: number, i: any) => acc + (Number(i.potencia_nominal_kw || i.potencia || 0) * (Number(i.qtd) || 1)), 0);
+
+                const mapKeyToCell = (key: string, cellRef: string) => {
+                    if (data[key] !== undefined && data[key] !== null) {
+                        const val = typeof data[key] === 'string' ? data[key].toUpperCase() : data[key];
+                        // If cell is merged, getting master cell handles it automatically in exceljs
+                        ws1.getCell(cellRef).value = val;
+                    }
+                };
+
+                mapKeyToCell('nome_cliente', 'C10');
+                mapKeyToCell('cpf_cnpj', 'R10');
+                mapKeyToCell('rg', 'AC9');
+                mapKeyToCell('rg_data_emissao', 'AC10');
+                mapKeyToCell('endereco', 'C13');
+                mapKeyToCell('cep', 'D15');
+                mapKeyToCell('cidade', 'I15');
+                mapKeyToCell('uf', 'Q15');
+                mapKeyToCell('email', 'V15');
+                mapKeyToCell('celular', 'T13');
+                mapKeyToCell('carga_declarada', 'F29');
+                mapKeyToCell('disjuntor_entrada', 'P29');
+                mapKeyToCell('tipo_ramal', 'F31');
+                mapKeyToCell('conta_contrato', 'Z17');
+                mapKeyToCell('resp_tecnico_nome', 'C38');
+                mapKeyToCell('resp_tecnico_titulo', 'M38');
+                mapKeyToCell('resp_tecnico_registro', 'Y38');
+                mapKeyToCell('resp_tecnico_email', 'C41');
+                mapKeyToCell('resp_tecnico_celular', 'S41');
+                mapKeyToCell('resp_tecnico_endereco', 'C44');
+                mapKeyToCell('resp_tecnico_cidade', 'P44');
+                mapKeyToCell('resp_tecnico_uf', 'AB43');
+
+                ws1.getCell('G49').value = 'SOLAR FOTOVOLTAICA';
+                ws1.getCell('G51').value = 'EMPREGANDO CONVERSOR ELETRÔNICO/INVERSOR';
+                ws1.getCell('AC53').value = totalModPower;
+                ws1.getCell('AC57').value = totalInvPower;
+            }
+
+            // Write to buffer instead of local disk for serverless compatibility
+            const filename = `Anexo_I_${(data.nome_cliente || 'Projeto').replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`;
+
+            // To maintain compatibility with existing router, save it to tmp space or return absolute path 
+            // In Serverless Vercel, we can only safely write to /tmp or use memory buffer
+            const isVercel = process.env.VERCEL || process.env.VERCEL_ENV;
+            const outputDir = isVercel ? require('os').tmpdir() : OUTPUT_DIR_EXCEL;
+            const outputPath = path.join(outputDir, filename);
 
             await workbook.xlsx.writeFile(outputPath);
-            console.log(`[NativeGenerator] Excel salvo em: ${outputPath}`);
+            console.log(`[NativeGenerator] Excel Node.js salvo em: ${outputPath}`);
 
             return { success: true, filePath: outputPath };
 
         } catch (error: any) {
-            console.error('[NativeGenerator] Error generating Excel:', error);
+            console.error('[NativeGenerator] Error generating Excel via ExcelJS:', error);
             return { success: false, error: error.message };
         }
     }

@@ -9,8 +9,6 @@ import * as db from "./db";
 import { promises as fs } from 'fs';
 import path from 'path';
 import { NativeGenerator } from "./lib/nativeGenerators";
-import { generateExcelDocument } from "./generators/excelGenerator";
-import { generateWordDocument } from "./generators/wordGenerator";
 import { generatePDFDiagram } from "./generators/pdfGenerator";
 
 export const appRouter = router({
