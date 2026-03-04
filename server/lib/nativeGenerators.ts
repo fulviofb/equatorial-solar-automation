@@ -13,10 +13,6 @@ const TEMPLATE_EXCEL = path.join(BASE_DIR, "TEMPLATE_ANEXO_I.xlsx");
 const OUTPUT_DIR_WORD = path.join(BASE_DIR, "Projetos_Gerados_Word");
 const OUTPUT_DIR_EXCEL = path.join(BASE_DIR, "Projetos_Gerados_Excel");
 
-// Garantir diretórios
-if (!fs.existsSync(OUTPUT_DIR_WORD)) fs.mkdirSync(OUTPUT_DIR_WORD, { recursive: true });
-if (!fs.existsSync(OUTPUT_DIR_EXCEL)) fs.mkdirSync(OUTPUT_DIR_EXCEL, { recursive: true });
-
 function getEstadoExtenso(uf: string): string {
     const estados: { [key: string]: string } = {
         'GO': 'GOIÁS', 'SP': 'SÃO PAULO', 'MG': 'MINAS GERAIS', 'RJ': 'RIO DE JANEIRO',
@@ -172,7 +168,12 @@ export const NativeGenerator = {
             });
 
             const filename = `Memorial_${(data.nome_cliente || 'Novo').replace(/ /g, '_')}.docx`;
-            const outputPath = path.join(OUTPUT_DIR_WORD, filename);
+            const isVercel = process.env.VERCEL || process.env.VERCEL_ENV;
+            const outputDir = isVercel ? require('os').tmpdir() : OUTPUT_DIR_WORD;
+            if (!isVercel && !fs.existsSync(outputDir)) {
+                fs.mkdirSync(outputDir, { recursive: true });
+            }
+            const outputPath = path.join(outputDir, filename);
 
             fs.writeFileSync(outputPath, buf);
             console.log(`[NativeGenerator] Word salvo em: ${outputPath}`);
@@ -288,6 +289,9 @@ export const NativeGenerator = {
             // In Serverless Vercel, we can only safely write to /tmp or use memory buffer
             const isVercel = process.env.VERCEL || process.env.VERCEL_ENV;
             const outputDir = isVercel ? require('os').tmpdir() : OUTPUT_DIR_EXCEL;
+            if (!isVercel && !fs.existsSync(outputDir)) {
+                fs.mkdirSync(outputDir, { recursive: true });
+            }
             const outputPath = path.join(outputDir, filename);
 
             await workbook.xlsx.writeFile(outputPath);
