@@ -257,31 +257,36 @@ class SDKServer {
   }
 
   async authenticateRequest(req: Request): Promise<User> {
-    // Mock login bypass if OAuth is not configured in Vercel.
-    if (!ENV.oAuthServerUrl) {
-      const mockOpenId = "mock-admin-offline";
-      let user = await db.getUserByOpenId(mockOpenId);
-      if (!user) {
-        await db.upsertUser({
-          openId: mockOpenId,
-          name: "Admin (Modo Offline)",
-          email: "admin@equatorial.com",
-          loginMethod: "mock",
-          role: "admin",
-          lastSignedIn: new Date(),
-        });
-        user = await db.getUserByOpenId(mockOpenId);
-      }
-      return user!;
-    }
+    const mockUser: User = {
+      id: 1,
+      openId: "mock-admin-offline",
+      name: "Admin (Local/Vercel)",
+      email: "admin@equatorial.com",
+      loginMethod: "mock",
+      role: "admin",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSignedIn: new Date(),
+    };
 
-    // Regular authentication flow
     const cookies = this.parseCookies(req.headers.cookie);
     const sessionCookie = cookies.get(COOKIE_NAME);
     const session = await this.verifySession(sessionCookie);
 
     if (!session) {
-      throw ForbiddenError("Invalid session cookie");
+      // Fallback: If no valid session exists, automatically authenticate as mock admin.
+      // This bypasses the need for an OAuth portal setup on Vercel.
+      try {
+        let user = await db.getUserByOpenId(mockUser.openId);
+        if (!user) {
+          await db.upsertUser(mockUser);
+          user = await db.getUserByOpenId(mockUser.openId);
+        }
+        return user || mockUser;
+      } catch (err) {
+        console.warn("[Auth] DB error during mock login fallback, returning mock object directly", err);
+        return mockUser;
+      }
     }
 
     const sessionUserId = session.openId;
