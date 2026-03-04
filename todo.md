@@ -114,16 +114,16 @@
 - [ ] Aguardando teste do usuário com logs de debug
 
 ## Bug - Erro 404 ao Ver Detalhes do Projeto
-- [ ] Verificar se a rota /projetos/:id existe no App.tsx
-- [ ] Criar página de detalhes do projeto se não existir
-- [ ] Testar navegação para detalhes do projeto
+- [x] Verificar se a rota /projetos/:id existe no App.tsx
+- [x] Criar página de detalhes do projeto se não existir (Refatorado ProjectDetails.tsx para arrumar extração de ID da URL e adicionar detalhes completos de componentes)
+- [x] Testar navegação para detalhes do projeto
 
-## Permitir Oversizing em Projetos
+## Permitir Edição em Projetos
 - [x] Mudar validação de oversizing de 'error' para 'warning'
 - [x] Permitir salvar projeto mesmo com warnings (apenas bloquear em caso de errors)
-- [ ] Adicionar rota /projetos/:id/editar
-- [ ] Criar página de edição de projeto
-- [ ] Testar fluxo completo com microinversor
+- [x] Adicionar rota /projetos/:id/editar (Já implementado)
+- [x] Criar página de edição de projeto (Resolvido reutilizando ProjectForm)
+- [x] Testar fluxo completo com microinversor
 
 ## CRÍTICO - Documentos Gerados Não Correspondem aos Templates da Equatorial
 - [x] Analisar documentos gerados atualmente (Excel, Word, PDF)
