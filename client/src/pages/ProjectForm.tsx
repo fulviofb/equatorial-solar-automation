@@ -254,9 +254,9 @@ export default function ProjectForm() {
             Voltar
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Novo Projeto</h1>
+            <h1 className="text-3xl font-bold text-gray-900">{isEditMode ? "Editar Projeto" : "Novo Projeto"}</h1>
             <p className="text-gray-600 mt-1">
-              Preencha os dados do projeto de microgeração distribuída
+              {isEditMode ? "Atualize os dados do projeto de microgeração distribuída" : "Preencha os dados do projeto de microgeração distribuída"}
             </p>
           </div>
         </div>
@@ -768,9 +768,9 @@ export default function ProjectForm() {
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={createMutation.isPending}>
+              <Button type="submit" disabled={isEditMode ? updateMutation.isPending : createMutation.isPending}>
                 <Save className="h-4 w-4 mr-2" />
-                {createMutation.isPending ? "Salvando..." : "Salvar Projeto"}
+                {(isEditMode ? updateMutation.isPending : createMutation.isPending) ? "Salvando..." : "Salvar Projeto"}
               </Button>
             </div>
           </form>
