@@ -107,7 +107,7 @@ export default function Inverters() {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    
+
     const data = {
       manufacturer: formData.get("manufacturer") as string,
       model: formData.get("model") as string,
@@ -136,7 +136,7 @@ export default function Inverters() {
       datasheetUrl: formData.get("datasheetUrl") as string || undefined,
     };
 
-    if (editing) {
+    if (editing && editing.id) {
       updateMutation.mutate({ id: editing.id, data });
     } else {
       createMutation.mutate(data);
@@ -181,318 +181,318 @@ export default function Inverters() {
                   Novo Inversor
                 </Button>
               </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>
-                  {editing ? "Editar Inversor" : "Novo Inversor"}
-                </DialogTitle>
-                <DialogDescription>
-                  Preencha as especificações técnicas do inversor
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleSubmit}>
-                <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="manufacturer">Fabricante *</Label>
-                      <Input
-                        id="manufacturer"
-                        name="manufacturer"
-                        placeholder="Ex: FOXESS"
-                        defaultValue={editing?.manufacturer}
-                        required
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="model">Modelo *</Label>
-                      <Input
-                        id="model"
-                        name="model"
-                        placeholder="Ex: Q1-2500-E"
-                        defaultValue={editing?.model}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <h3 className="font-semibold text-sm mt-2">Entrada (CC)</h3>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="nominalPowerDC">Potência Nominal CC (W)</Label>
-                      <Input
-                        id="nominalPowerDC"
-                        name="nominalPowerDC"
-                        type="number"
-                        placeholder="700"
-                        defaultValue={editing?.nominalPowerDC}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="maxPowerDC">Potência Máxima CC (W)</Label>
-                      <Input
-                        id="maxPowerDC"
-                        name="maxPowerDC"
-                        type="number"
-                        placeholder="700"
-                        defaultValue={editing?.maxPowerDC}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="maxVoltageDC">Tensão Máxima de Entrada [V]</Label>
-                      <Input
-                        id="maxVoltageDC"
-                        name="maxVoltageDC"
-                        placeholder="60"
-                        defaultValue={editing?.maxVoltageDC}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="maxCurrentDC">Corrente de Curto-circuito [A]</Label>
-                      <Input
-                        id="maxCurrentDC"
-                        name="maxCurrentDC"
-                        placeholder="20"
-                        defaultValue={editing?.maxCurrentDC}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="maxCurrentPerInput">Corrente Máxima por Entrada [A]</Label>
-                      <Input
-                        id="maxCurrentPerInput"
-                        name="maxCurrentPerInput"
-                        placeholder="18"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="mpptVoltageMax">Faixa MPPT Máxima [V]</Label>
-                      <Input
-                        id="mpptVoltageMax"
-                        name="mpptVoltageMax"
-                        placeholder="60"
-                        defaultValue={editing?.mpptVoltageMax}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="mpptVoltageMin">Faixa MPPT Mínima [V]</Label>
-                      <Input
-                        id="mpptVoltageMin"
-                        name="mpptVoltageMin"
-                        placeholder="30"
-                        defaultValue={editing?.mpptVoltageMin}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="startupVoltageDC">Tensão de Partida [V]</Label>
-                      <Input
-                        id="startupVoltageDC"
-                        name="startupVoltageDC"
-                        placeholder="32"
-                        defaultValue={editing?.startupVoltageDC}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="numberOfMppt">Quantidade de MPPT</Label>
-                      <Input
-                        id="numberOfMppt"
-                        name="numberOfMppt"
-                        type="number"
-                        placeholder="4"
-                        defaultValue={editing?.numberOfMppt}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="numberOfStrings">Quantidade de Entradas CC</Label>
-                      <Input
-                        id="numberOfStrings"
-                        name="numberOfStrings"
-                        type="number"
-                        placeholder="4"
-                        defaultValue={editing?.numberOfStrings}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="maxCurrentPerInput">Corrente Máxima por Entrada [A]</Label>
-                      <Input
-                        id="maxCurrentPerInput"
-                        name="maxCurrentPerInput"
-                        placeholder="18"
-                        defaultValue={editing?.maxCurrentPerInput}
-                      />
-                    </div>
-                    <div className="grid gap-2 col-span-2">
-                      <Label htmlFor="isMicroinverter" className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          id="isMicroinverter"
-                          name="isMicroinverter"
-                          className="h-4 w-4"
-                          defaultChecked={editing?.isMicroinverter === 1}
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>
+                    {editing && editing.id ? "Editar Inversor" : "Novo Inversor"}
+                  </DialogTitle>
+                  <DialogDescription>
+                    Preencha as especificações técnicas do inversor
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleSubmit}>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="manufacturer">Fabricante *</Label>
+                        <Input
+                          id="manufacturer"
+                          name="manufacturer"
+                          placeholder="Ex: FOXESS"
+                          defaultValue={editing?.manufacturer}
+                          required
                         />
-                        <span>É microinversor? (cada saída opera com 1 módulo independente)</span>
-                      </Label>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Marque esta opção se este inversor opera com módulos individualizados (microinversor),
-                        onde cada entrada gerencia um módulo separadamente, sem conexão em série.
-                      </p>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="model">Modelo *</Label>
+                        <Input
+                          id="model"
+                          name="model"
+                          placeholder="Ex: Q1-2500-E"
+                          defaultValue={editing?.model}
+                          required
+                        />
+                      </div>
                     </div>
-                  </div>
 
-                  <h3 className="font-semibold text-sm mt-2">Saída (CA)</h3>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="nominalPowerAC">Potência Nominal CA (W) *</Label>
-                      <Input
-                        id="nominalPowerAC"
-                        name="nominalPowerAC"
-                        type="number"
-                        placeholder="2500"
-                        defaultValue={editing?.nominalPowerAC}
-                        required
-                      />
+                    <h3 className="font-semibold text-sm mt-2">Entrada (CC)</h3>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="nominalPowerDC">Potência Nominal CC (W)</Label>
+                        <Input
+                          id="nominalPowerDC"
+                          name="nominalPowerDC"
+                          type="number"
+                          placeholder="700"
+                          defaultValue={editing?.nominalPowerDC}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="maxPowerDC">Potência Máxima CC (W)</Label>
+                        <Input
+                          id="maxPowerDC"
+                          name="maxPowerDC"
+                          type="number"
+                          placeholder="700"
+                          defaultValue={editing?.maxPowerDC}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="maxVoltageDC">Tensão Máxima de Entrada [V]</Label>
+                        <Input
+                          id="maxVoltageDC"
+                          name="maxVoltageDC"
+                          placeholder="60"
+                          defaultValue={editing?.maxVoltageDC}
+                        />
+                      </div>
                     </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="nominalVoltageAC">Tensão Nominal de Saída [V]</Label>
-                      <Input
-                        id="nominalVoltageAC"
-                        name="nominalVoltageAC"
-                        placeholder="220"
-                        defaultValue={editing?.nominalVoltageAC}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="nominalFrequency">Frequência Nominal [Hz]</Label>
-                      <Input
-                        id="nominalFrequency"
-                        name="nominalFrequency"
-                        placeholder="60"
-                        defaultValue={editing?.nominalFrequency}
-                      />
-                    </div>
-                  </div>
 
-                  <div className="grid grid-cols-4 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="maxCurrentAC">Corrente Máxima de Saída [A]</Label>
-                      <Input
-                        id="maxCurrentAC"
-                        name="maxCurrentAC"
-                        placeholder="11.36"
-                        defaultValue={editing?.maxCurrentAC}
-                      />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="maxCurrentDC">Corrente de Curto-circuito [A]</Label>
+                        <Input
+                          id="maxCurrentDC"
+                          name="maxCurrentDC"
+                          placeholder="20"
+                          defaultValue={editing?.maxCurrentDC}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="maxCurrentPerInput">Corrente Máxima por Entrada [A]</Label>
+                        <Input
+                          id="maxCurrentPerInput"
+                          name="maxCurrentPerInput"
+                          placeholder="18"
+                        />
+                      </div>
                     </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="powerFactor">Fator de Potência</Label>
-                      <Input
-                        id="powerFactor"
-                        name="powerFactor"
-                        placeholder=">0.99"
-                        defaultValue={editing?.powerFactor}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="thdCurrent">Distorção Harmônica (THD) [%]</Label>
-                      <Input
-                        id="thdCurrent"
-                        name="thdCurrent"
-                        placeholder="<3"
-                        defaultValue={editing?.thdCurrent}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="connectionType">Tipo Conexão</Label>
-                      <Input
-                        id="connectionType"
-                        name="connectionType"
-                        placeholder="1+1+1"
-                        defaultValue={editing?.connectionType}
-                      />
-                    </div>
-                  </div>
 
-                  <h3 className="font-semibold text-sm mt-2">Eficiência e Certificação</h3>
-                  <div className="grid grid-cols-4 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="maxEfficiency">Eficiência Máxima (%)</Label>
-                      <Input
-                        id="maxEfficiency"
-                        name="maxEfficiency"
-                        placeholder="97.0"
-                        defaultValue={editing?.maxEfficiency}
-                      />
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="mpptVoltageMax">Faixa MPPT Máxima [V]</Label>
+                        <Input
+                          id="mpptVoltageMax"
+                          name="mpptVoltageMax"
+                          placeholder="60"
+                          defaultValue={editing?.mpptVoltageMax}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="mpptVoltageMin">Faixa MPPT Mínima [V]</Label>
+                        <Input
+                          id="mpptVoltageMin"
+                          name="mpptVoltageMin"
+                          placeholder="30"
+                          defaultValue={editing?.mpptVoltageMin}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="startupVoltageDC">Tensão de Partida [V]</Label>
+                        <Input
+                          id="startupVoltageDC"
+                          name="startupVoltageDC"
+                          placeholder="32"
+                          defaultValue={editing?.startupVoltageDC}
+                        />
+                      </div>
                     </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="euEfficiency">Eficiência EU (%)</Label>
-                      <Input
-                        id="euEfficiency"
-                        name="euEfficiency"
-                        placeholder="96.7"
-                        defaultValue={editing?.euEfficiency}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="mpptEfficiency">Eficiência MPPT (%)</Label>
-                      <Input
-                        id="mpptEfficiency"
-                        name="mpptEfficiency"
-                        placeholder="99.9"
-                        defaultValue={editing?.mpptEfficiency}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="certificationNumber">Nº Certificação</Label>
-                      <Input
-                        id="certificationNumber"
-                        name="certificationNumber"
-                        placeholder="004468/2025"
-                        defaultValue={editing?.certificationNumber}
-                      />
-                    </div>
-                  </div>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="datasheetUrl">URL do Datasheet</Label>
-                    <Input
-                      id="datasheetUrl"
-                      name="datasheetUrl"
-                      type="url"
-                      placeholder="https://..."
-                      defaultValue={editing?.datasheetUrl}
-                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="numberOfMppt">Quantidade de MPPT</Label>
+                        <Input
+                          id="numberOfMppt"
+                          name="numberOfMppt"
+                          type="number"
+                          placeholder="4"
+                          defaultValue={editing?.numberOfMppt}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="numberOfStrings">Quantidade de Entradas CC</Label>
+                        <Input
+                          id="numberOfStrings"
+                          name="numberOfStrings"
+                          type="number"
+                          placeholder="4"
+                          defaultValue={editing?.numberOfStrings}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="maxCurrentPerInput">Corrente Máxima por Entrada [A]</Label>
+                        <Input
+                          id="maxCurrentPerInput"
+                          name="maxCurrentPerInput"
+                          placeholder="18"
+                          defaultValue={editing?.maxCurrentPerInput}
+                        />
+                      </div>
+                      <div className="grid gap-2 col-span-2">
+                        <Label htmlFor="isMicroinverter" className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            id="isMicroinverter"
+                            name="isMicroinverter"
+                            className="h-4 w-4"
+                            defaultChecked={editing?.isMicroinverter === 1}
+                          />
+                          <span>É microinversor? (cada saída opera com 1 módulo independente)</span>
+                        </Label>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Marque esta opção se este inversor opera com módulos individualizados (microinversor),
+                          onde cada entrada gerencia um módulo separadamente, sem conexão em série.
+                        </p>
+                      </div>
+                    </div>
+
+                    <h3 className="font-semibold text-sm mt-2">Saída (CA)</h3>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="nominalPowerAC">Potência Nominal CA (W) *</Label>
+                        <Input
+                          id="nominalPowerAC"
+                          name="nominalPowerAC"
+                          type="number"
+                          placeholder="2500"
+                          defaultValue={editing?.nominalPowerAC}
+                          required
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="nominalVoltageAC">Tensão Nominal de Saída [V]</Label>
+                        <Input
+                          id="nominalVoltageAC"
+                          name="nominalVoltageAC"
+                          placeholder="220"
+                          defaultValue={editing?.nominalVoltageAC}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="nominalFrequency">Frequência Nominal [Hz]</Label>
+                        <Input
+                          id="nominalFrequency"
+                          name="nominalFrequency"
+                          placeholder="60"
+                          defaultValue={editing?.nominalFrequency}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="maxCurrentAC">Corrente Máxima de Saída [A]</Label>
+                        <Input
+                          id="maxCurrentAC"
+                          name="maxCurrentAC"
+                          placeholder="11.36"
+                          defaultValue={editing?.maxCurrentAC}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="powerFactor">Fator de Potência</Label>
+                        <Input
+                          id="powerFactor"
+                          name="powerFactor"
+                          placeholder=">0.99"
+                          defaultValue={editing?.powerFactor}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="thdCurrent">Distorção Harmônica (THD) [%]</Label>
+                        <Input
+                          id="thdCurrent"
+                          name="thdCurrent"
+                          placeholder="<3"
+                          defaultValue={editing?.thdCurrent}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="connectionType">Tipo Conexão</Label>
+                        <Input
+                          id="connectionType"
+                          name="connectionType"
+                          placeholder="1+1+1"
+                          defaultValue={editing?.connectionType}
+                        />
+                      </div>
+                    </div>
+
+                    <h3 className="font-semibold text-sm mt-2">Eficiência e Certificação</h3>
+                    <div className="grid grid-cols-4 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="maxEfficiency">Eficiência Máxima (%)</Label>
+                        <Input
+                          id="maxEfficiency"
+                          name="maxEfficiency"
+                          placeholder="97.0"
+                          defaultValue={editing?.maxEfficiency}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="euEfficiency">Eficiência EU (%)</Label>
+                        <Input
+                          id="euEfficiency"
+                          name="euEfficiency"
+                          placeholder="96.7"
+                          defaultValue={editing?.euEfficiency}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="mpptEfficiency">Eficiência MPPT (%)</Label>
+                        <Input
+                          id="mpptEfficiency"
+                          name="mpptEfficiency"
+                          placeholder="99.9"
+                          defaultValue={editing?.mpptEfficiency}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="certificationNumber">Nº Certificação</Label>
+                        <Input
+                          id="certificationNumber"
+                          name="certificationNumber"
+                          placeholder="004468/2025"
+                          defaultValue={editing?.certificationNumber}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="datasheetUrl">URL do Datasheet</Label>
+                      <Input
+                        id="datasheetUrl"
+                        name="datasheetUrl"
+                        type="url"
+                        placeholder="https://..."
+                        defaultValue={editing?.datasheetUrl}
+                      />
+                    </div>
                   </div>
-                </div>
-                <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setOpen(false);
-                      setEditing(null);
-                    }}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={createMutation.isPending || updateMutation.isPending}
-                  >
-                    {editing ? "Atualizar" : "Cadastrar"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+                  <DialogFooter>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setOpen(false);
+                        setEditing(null);
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={createMutation.isPending || updateMutation.isPending}
+                    >
+                      {editing && editing.id ? "Atualizar" : "Cadastrar"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 

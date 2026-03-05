@@ -107,7 +107,7 @@ export default function SolarModules() {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    
+
     const data = {
       manufacturer: formData.get("manufacturer") as string,
       model: formData.get("model") as string,
@@ -124,7 +124,7 @@ export default function SolarModules() {
       datasheetUrl: formData.get("datasheetUrl") as string || undefined,
     };
 
-    if (editing) {
+    if (editing && editing.id) {
       updateMutation.mutate({ id: editing.id, data });
     } else {
       createMutation.mutate(data);
@@ -169,177 +169,177 @@ export default function SolarModules() {
                   Novo Módulo
                 </Button>
               </DialogTrigger>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>
-                  {editing ? "Editar Módulo Fotovoltaico" : "Novo Módulo Fotovoltaico"}
-                </DialogTitle>
-                <DialogDescription>
-                  Preencha as especificações técnicas do módulo
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleSubmit}>
-                <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="manufacturer">Fabricante *</Label>
-                      <Input
-                        id="manufacturer"
-                        name="manufacturer"
-                        placeholder="Ex: TRINA"
-                        defaultValue={editing?.manufacturer}
-                        required
-                      />
+              <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>
+                    {editing && editing.id ? "Editar Módulo Fotovoltaico" : "Novo Módulo Fotovoltaico"}
+                  </DialogTitle>
+                  <DialogDescription>
+                    Preencha as especificações técnicas do módulo
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleSubmit}>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="manufacturer">Fabricante *</Label>
+                        <Input
+                          id="manufacturer"
+                          name="manufacturer"
+                          placeholder="Ex: TRINA"
+                          defaultValue={editing?.manufacturer}
+                          required
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="model">Modelo *</Label>
+                        <Input
+                          id="model"
+                          name="model"
+                          placeholder="Ex: TSM-NEG21C.20"
+                          defaultValue={editing?.model}
+                          required
+                        />
+                      </div>
                     </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="model">Modelo *</Label>
-                      <Input
-                        id="model"
-                        name="model"
-                        placeholder="Ex: TSM-NEG21C.20"
-                        defaultValue={editing?.model}
-                        required
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="nominalPower">Potência Nominal (W) *</Label>
-                      <Input
-                        id="nominalPower"
-                        name="nominalPower"
-                        type="number"
-                        placeholder="700"
-                        defaultValue={editing?.nominalPower}
-                        required
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="voc">Voc (V) *</Label>
-                      <Input
-                        id="voc"
-                        name="voc"
-                        placeholder="48.6"
-                        defaultValue={editing?.voc}
-                        required
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="isc">Isc (A) *</Label>
-                      <Input
-                        id="isc"
-                        name="isc"
-                        placeholder="18.32"
-                        defaultValue={editing?.isc}
-                        required
-                      />
-                    </div>
-                  </div>
 
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="vmpp">Vmpp (V) *</Label>
-                      <Input
-                        id="vmpp"
-                        name="vmpp"
-                        placeholder="40.5"
-                        defaultValue={editing?.vmpp}
-                        required
-                      />
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="nominalPower">Potência Nominal (W) *</Label>
+                        <Input
+                          id="nominalPower"
+                          name="nominalPower"
+                          type="number"
+                          placeholder="700"
+                          defaultValue={editing?.nominalPower}
+                          required
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="voc">Voc (V) *</Label>
+                        <Input
+                          id="voc"
+                          name="voc"
+                          placeholder="48.6"
+                          defaultValue={editing?.voc}
+                          required
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="isc">Isc (A) *</Label>
+                        <Input
+                          id="isc"
+                          name="isc"
+                          placeholder="18.32"
+                          defaultValue={editing?.isc}
+                          required
+                        />
+                      </div>
                     </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="impp">Impp (A) *</Label>
-                      <Input
-                        id="impp"
-                        name="impp"
-                        placeholder="17.29"
-                        defaultValue={editing?.impp}
-                        required
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="efficiency">Eficiência (%)</Label>
-                      <Input
-                        id="efficiency"
-                        name="efficiency"
-                        placeholder="22.9"
-                        defaultValue={editing?.efficiency}
-                      />
-                    </div>
-                  </div>
 
-                  <div className="grid grid-cols-4 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="length">Comprimento (m)</Label>
-                      <Input
-                        id="length"
-                        name="length"
-                        placeholder="2.384"
-                        defaultValue={editing?.length}
-                      />
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="vmpp">Vmpp (V) *</Label>
+                        <Input
+                          id="vmpp"
+                          name="vmpp"
+                          placeholder="40.5"
+                          defaultValue={editing?.vmpp}
+                          required
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="impp">Impp (A) *</Label>
+                        <Input
+                          id="impp"
+                          name="impp"
+                          placeholder="17.29"
+                          defaultValue={editing?.impp}
+                          required
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="efficiency">Eficiência (%)</Label>
+                        <Input
+                          id="efficiency"
+                          name="efficiency"
+                          placeholder="22.9"
+                          defaultValue={editing?.efficiency}
+                        />
+                      </div>
                     </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="width">Largura (m)</Label>
-                      <Input
-                        id="width"
-                        name="width"
-                        placeholder="1.303"
-                        defaultValue={editing?.width}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="area">Área (m²)</Label>
-                      <Input
-                        id="area"
-                        name="area"
-                        placeholder="3.106"
-                        defaultValue={editing?.area}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="weight">Peso (kg)</Label>
-                      <Input
-                        id="weight"
-                        name="weight"
-                        placeholder="38.3"
-                        defaultValue={editing?.weight}
-                      />
-                    </div>
-                  </div>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="datasheetUrl">URL do Datasheet</Label>
-                    <Input
-                      id="datasheetUrl"
-                      name="datasheetUrl"
-                      type="url"
-                      placeholder="https://..."
-                      defaultValue={editing?.datasheetUrl}
-                    />
+                    <div className="grid grid-cols-4 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="length">Comprimento (m)</Label>
+                        <Input
+                          id="length"
+                          name="length"
+                          placeholder="2.384"
+                          defaultValue={editing?.length}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="width">Largura (m)</Label>
+                        <Input
+                          id="width"
+                          name="width"
+                          placeholder="1.303"
+                          defaultValue={editing?.width}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="area">Área (m²)</Label>
+                        <Input
+                          id="area"
+                          name="area"
+                          placeholder="3.106"
+                          defaultValue={editing?.area}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="weight">Peso (kg)</Label>
+                        <Input
+                          id="weight"
+                          name="weight"
+                          placeholder="38.3"
+                          defaultValue={editing?.weight}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="datasheetUrl">URL do Datasheet</Label>
+                      <Input
+                        id="datasheetUrl"
+                        name="datasheetUrl"
+                        type="url"
+                        placeholder="https://..."
+                        defaultValue={editing?.datasheetUrl}
+                      />
+                    </div>
                   </div>
-                </div>
-                <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setOpen(false);
-                      setEditing(null);
-                    }}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={createMutation.isPending || updateMutation.isPending}
-                  >
-                    {editing ? "Atualizar" : "Cadastrar"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+                  <DialogFooter>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setOpen(false);
+                        setEditing(null);
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={createMutation.isPending || updateMutation.isPending}
+                    >
+                      {editing && editing.id ? "Atualizar" : "Cadastrar"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 
