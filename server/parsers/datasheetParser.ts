@@ -58,11 +58,11 @@ export interface InverterDatasheetData {
 async function extractPdfText(pdfBuffer: Buffer): Promise<string> {
   const tempId = randomBytes(16).toString('hex');
   const tempPdfPath = join(tmpdir(), `pdf-${tempId}.pdf`);
-  
+
   try {
     // Salvar buffer em arquivo temporário
     await writeFile(tempPdfPath, pdfBuffer);
-    
+
     // Tentar usar pdftotext (disponível em desenvolvimento)
     try {
       const { stdout } = await execAsync(`pdftotext "${tempPdfPath}" -`);
@@ -70,21 +70,20 @@ async function extractPdfText(pdfBuffer: Buffer): Promise<string> {
     } catch (pdfError) {
       // pdftotext não disponível, usar LLM como fallback
       console.log('[Datasheet Parser] pdftotext not available, using LLM fallback');
-      
+
       // Converter PDF para base64 para enviar ao LLM
       const base64Pdf = pdfBuffer.toString('base64');
       const dataUrl = `data:application/pdf;base64,${base64Pdf}`;
-      
+
       const response = await invokeLLM({
         messages: [
           {
             role: 'user',
             content: [
               {
-                type: 'file_url',
-                file_url: {
-                  url: dataUrl,
-                  mime_type: 'application/pdf'
+                type: 'image_url',
+                image_url: {
+                  url: dataUrl
                 }
               },
               {
@@ -95,7 +94,7 @@ async function extractPdfText(pdfBuffer: Buffer): Promise<string> {
           }
         ]
       });
-      
+
       const content = response.choices[0]?.message?.content;
       return typeof content === 'string' ? content : '';
     }
@@ -197,7 +196,7 @@ export async function parseDatasheet(pdfBuffer: Buffer): Promise<{ type: 'module
   try {
     // Extrair texto do PDF
     const text = await extractPdfText(pdfBuffer);
-    
+
     if (!text || text.trim().length === 0) {
       throw new Error('Não foi possível extrair texto do PDF');
     }
@@ -213,6 +212,7 @@ export async function parseDatasheet(pdfBuffer: Buffer): Promise<{ type: 'module
     } else if (isInverter) {
       type = 'inverter';
     } else {
+      console.error('[Datasheet Parser] Texto retornado pelo LLM que não deu match:', text.substring(0, 1000));
       throw new Error('Não foi possível identificar o tipo de datasheet (módulo ou inversor)');
     }
 
