@@ -38,7 +38,8 @@ export function validateModuleInverterCompatibility(
   modules: ModuleData[],
   modulesPerString: number,
   numberOfStrings: number,
-  inverter: InverterData
+  inverter: InverterData,
+  invertersQuantity: number = 1
 ): CompatibilityIssue[] {
   const issues: CompatibilityIssue[] = [];
 
@@ -62,8 +63,8 @@ export function validateModuleInverterCompatibility(
   const inverterStartupV = inverter.startupVoltageDC ? parseFloat(inverter.startupVoltageDC) : null;
   const inverterMaxCurrentPerInput = inverter.maxCurrentPerInput ? parseFloat(inverter.maxCurrentPerInput) : null;
 
-  // Detectar se é microinversor
-  const isMicroinverter = inverter.isMicroinverter === 1;
+  // Detectar se é microinversor (pode vir como 1/0 do banco ou true/false do formulário)
+  const isMicroinverter = inverter.isMicroinverter === 1 || inverter.isMicroinverter === true || String(inverter.isMicroinverter) === "1" || String(inverter.isMicroinverter) === "true";
 
   // Para microinversores, cada saída opera com 1 módulo independente
   // Portanto, não há conexão em série e modulesPerString deve ser sempre 1
@@ -75,7 +76,7 @@ export function validateModuleInverterCompatibility(
     issues.push({
       type: 'error',
       field: 'voltage',
-      message: isMicroinverter 
+      message: isMicroinverter
         ? `Tensão de circuito aberto do módulo (${stringVoc.toFixed(1)}V) excede a tensão máxima do inversor (${inverterMaxVdc}V).`
         : `Tensão de circuito aberto da string (${stringVoc.toFixed(1)}V) excede a tensão máxima do inversor (${inverterMaxVdc}V). Reduza o número de módulos por string.`
     });
@@ -131,23 +132,25 @@ export function validateModuleInverterCompatibility(
 
   // 5. Validar potência total
   const totalPowerDC = module.nominalPower * modulesPerString * numberOfStrings;
-  const inverterMaxPower = inverter.maxPowerDC || inverter.nominalPowerDC || inverter.nominalPowerAC * 1.3;
-  
-  if (inverterMaxPower && totalPowerDC > inverterMaxPower) {
+  const singleInverterMaxPower = inverter.maxPowerDC || inverter.nominalPowerDC || inverter.nominalPowerAC * 1.3;
+  const systemInverterMaxPower = singleInverterMaxPower * invertersQuantity;
+
+  if (singleInverterMaxPower && totalPowerDC > systemInverterMaxPower) {
     issues.push({
       type: 'warning',
       field: 'power',
-      message: `Potência total dos módulos (${(totalPowerDC / 1000).toFixed(2)}kW) excede a potência máxima DC do inversor (${(inverterMaxPower / 1000).toFixed(2)}kW). Pode haver limitação de potência.`
+      message: `Potência total dos módulos (${(totalPowerDC / 1000).toFixed(2)}kW) excede a potência máxima DC do sistema de inversor(es) (${(systemInverterMaxPower / 1000).toFixed(2)}kW). Pode haver limitação de potência.`
     });
   }
 
   // 6. Validar subdimensionamento (potência muito baixa)
-  const minRecommendedPower = inverter.nominalPowerAC * 0.7;
-  if (totalPowerDC < minRecommendedPower) {
+  const singleMinRecommendedPower = inverter.nominalPowerAC * 0.7;
+  const systemMinRecommendedPower = singleMinRecommendedPower * invertersQuantity;
+  if (totalPowerDC < systemMinRecommendedPower) {
     issues.push({
       type: 'warning',
       field: 'power',
-      message: `Potência total dos módulos (${(totalPowerDC / 1000).toFixed(2)}kW) está muito abaixo da potência nominal do inversor (${(inverter.nominalPowerAC / 1000).toFixed(2)}kW). O sistema pode operar com baixa eficiência.`
+      message: `Potência total dos módulos (${(totalPowerDC / 1000).toFixed(2)}kW) está muito abaixo da potência nominal do sistema de inversor(es) (${((inverter.nominalPowerAC * invertersQuantity) / 1000).toFixed(2)}kW). O sistema pode operar com baixa eficiência.`
     });
   }
 
@@ -181,7 +184,7 @@ export function calculateOptimalStringSize(
 ): { min: number; max: number; recommended: number } {
   const moduleVoc = parseFloat(module.voc);
   const moduleVmpp = parseFloat(module.vmpp);
-  
+
   const inverterMaxVdc = inverter.maxVoltageDC ? parseFloat(inverter.maxVoltageDC) : 1000;
   const inverterMpptMax = inverter.mpptVoltageMax ? parseFloat(inverter.mpptVoltageMax) : inverterMaxVdc * 0.9;
   const inverterMpptMin = inverter.mpptVoltageMin ? parseFloat(inverter.mpptVoltageMin) : 100;
@@ -189,19 +192,19 @@ export function calculateOptimalStringSize(
 
   // Máximo de módulos baseado na tensão de circuito aberto
   const maxByVoc = Math.floor(inverterMaxVdc / moduleVoc);
-  
+
   // Máximo de módulos baseado na faixa MPPT
   const maxByMppt = Math.floor(inverterMpptMax / moduleVmpp);
-  
+
   // Mínimo de módulos baseado na tensão de partida
   const minByStartup = Math.ceil(inverterStartupV / moduleVmpp);
-  
+
   // Mínimo de módulos baseado na faixa MPPT mínima
   const minByMppt = Math.ceil(inverterMpptMin / moduleVmpp);
 
   const min = Math.max(minByStartup, minByMppt);
   const max = Math.min(maxByVoc, maxByMppt);
-  
+
   // Recomendado: meio da faixa MPPT
   const recommended = Math.round((inverterMpptMax + inverterMpptMin) / (2 * moduleVmpp));
 

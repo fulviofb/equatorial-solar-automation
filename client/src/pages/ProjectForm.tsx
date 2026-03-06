@@ -134,6 +134,7 @@ export default function ProjectForm() {
             isMicroinverter: Boolean(inverter.isMicroinverter),
             maxCurrentPerInput: inverter.maxCurrentPerInput || undefined,
           },
+          invertersQuantity: firstInverter.quantity,
         };
 
         console.log('[DEBUG] Dados enviados para validação:', requestData);

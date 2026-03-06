@@ -115,23 +115,23 @@ export const inverters = mysqlTable("inverters", {
   nominalPowerAC: int("nominalPowerAC").notNull(), // Potência nominal CA (W)
   nominalPowerDC: int("nominalPowerDC"), // Potência nominal CC (W)
   maxPowerDC: int("maxPowerDC"), // Máxima potência CC (W)
-  maxVoltageDC: varchar("maxVoltageDC", { length: 20 }), // Máxima tensão CC (V)
-  maxCurrentDC: varchar("maxCurrentDC", { length: 20 }), // Máxima corrente CC (A)
-  mpptVoltageMax: varchar("mpptVoltageMax", { length: 20 }), // Máxima tensão MPPT (V)
-  mpptVoltageMin: varchar("mpptVoltageMin", { length: 20 }), // Mínima tensão MPPT (V)
-  startupVoltageDC: varchar("startupVoltageDC", { length: 20 }), // Tensão de partida CC (V)
+  maxVoltageDC: varchar("maxVoltageDC", { length: 50 }), // Máxima tensão CC (V)
+  maxCurrentDC: varchar("maxCurrentDC", { length: 50 }), // Máxima corrente CC (A)
+  mpptVoltageMax: varchar("mpptVoltageMax", { length: 50 }), // Máxima tensão MPPT (V)
+  mpptVoltageMin: varchar("mpptVoltageMin", { length: 50 }), // Mínima tensão MPPT (V)
+  startupVoltageDC: varchar("startupVoltageDC", { length: 50 }), // Tensão de partida CC (V)
   numberOfMppt: int("numberOfMppt"), // Quantidade de MPPT
   numberOfStrings: int("numberOfStrings"), // Quantidade de strings
-  maxCurrentPerInput: varchar("maxCurrentPerInput", { length: 20 }), // Corrente máxima por entrada (A)
+  maxCurrentPerInput: varchar("maxCurrentPerInput", { length: 50 }), // Corrente máxima por entrada (A)
   isMicroinverter: int("isMicroinverter").default(0), // 0 = inversor string, 1 = microinversor
-  nominalVoltageAC: varchar("nominalVoltageAC", { length: 20 }), // Tensão nominal CA (V)
-  nominalFrequency: varchar("nominalFrequency", { length: 10 }), // Frequência nominal (Hz)
-  maxCurrentAC: varchar("maxCurrentAC", { length: 20 }), // Máxima corrente CA (A)
-  powerFactor: varchar("powerFactor", { length: 10 }), // Fator de potência
-  thdCurrent: varchar("thdCurrent", { length: 10 }), // THD de corrente (%)
-  maxEfficiency: varchar("maxEfficiency", { length: 10 }), // Eficiência máxima (%)
-  euEfficiency: varchar("euEfficiency", { length: 10 }), // Eficiência EU (%)
-  mpptEfficiency: varchar("mpptEfficiency", { length: 10 }), // Eficiência MPPT (%)
+  nominalVoltageAC: varchar("nominalVoltageAC", { length: 50 }), // Tensão nominal CA (V)
+  nominalFrequency: varchar("nominalFrequency", { length: 50 }), // Frequência nominal (Hz)
+  maxCurrentAC: varchar("maxCurrentAC", { length: 50 }), // Máxima corrente CA (A)
+  powerFactor: varchar("powerFactor", { length: 50 }), // Fator de potência
+  thdCurrent: varchar("thdCurrent", { length: 50 }), // THD de corrente (%)
+  maxEfficiency: varchar("maxEfficiency", { length: 50 }), // Eficiência máxima (%)
+  euEfficiency: varchar("euEfficiency", { length: 50 }), // Eficiência EU (%)
+  mpptEfficiency: varchar("mpptEfficiency", { length: 50 }), // Eficiência MPPT (%)
   connectionType: varchar("connectionType", { length: 50 }), // Tipo de conexão (ex: 1+1+1)
   certificationNumber: varchar("certificationNumber", { length: 100 }), // Número do certificado de conformidade
   datasheetUrl: text("datasheetUrl"), // URL do datasheet
@@ -150,7 +150,7 @@ export const projects = mysqlTable("projects", {
   userId: int("userId").notNull(), // Usuário que criou o projeto
   clientId: int("clientId").notNull(), // Cliente (titular da UC)
   technicalResponsibleId: int("technicalResponsibleId").notNull(), // Responsável técnico
-  
+
   // Dados da Unidade Consumidora
   accountContract: varchar("accountContract", { length: 50 }), // Conta Contrato
   connectionType: mysqlEnum("connectionType", ["MONOFÁSICO", "BIFÁSICO", "TRIFÁSICO"]).notNull(),
@@ -164,7 +164,7 @@ export const projects = mysqlTable("projects", {
   coordinateY: varchar("coordinateY", { length: 50 }), // Coordenada Y (UTM)
   hasSpecialLoads: boolean("hasSpecialLoads").default(false), // Possui cargas especiais
   specialLoadsDetail: text("specialLoadsDetail"), // Detalhamento de cargas especiais
-  
+
   // Tipo de Solicitação
   requestType: mysqlEnum("requestType", [
     "LIGAÇÃO NOVA DE UNIDADE CONSUMIDORA COM GERAÇÃO DISTRIBUÍDA",
@@ -173,7 +173,7 @@ export const projects = mysqlTable("projects", {
     "AUMENTO DA POTÊNCIA DE GERAÇÃO EM UC COM GD EXISTENTE SEM AUMENTO DE POTÊNCIA DISPONIBILIZADA",
     "AUMENTO DA POTÊNCIA DE GERAÇÃO EM UC COM GD EXISTENTE COM AUMENTO DE POTÊNCIA DISPONIBILIZADA"
   ]).notNull(),
-  
+
   // Características da Microgeração
   primarySourceType: mysqlEnum("primarySourceType", [
     "SOLAR FOTOVOLTAICA",
@@ -198,10 +198,10 @@ export const projects = mysqlTable("projects", {
   ]).notNull(),
   operationStartDate: timestamp("operationStartDate"), // Data de início da operação
   totalInstalledPower: int("totalInstalledPower").notNull(), // Potência instalada total (W)
-  
+
   // Status do projeto
   status: mysqlEnum("status", ["RASCUNHO", "COMPLETO", "ENVIADO", "APROVADO"]).default("RASCUNHO").notNull(),
-  
+
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

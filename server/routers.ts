@@ -802,6 +802,7 @@ export const appRouter = router({
           isMicroinverter: z.boolean().optional(),
           maxCurrentPerInput: z.string().optional(),
         }),
+        invertersQuantity: z.number().optional().default(1),
       }))
       .mutation(({ input }) => {
         console.log('[BACKEND DEBUG] Dados recebidos:', JSON.stringify(input, null, 2));
@@ -812,7 +813,8 @@ export const appRouter = router({
           input.modules,
           input.modulesPerString,
           input.numberOfStrings,
-          input.inverter
+          input.inverter,
+          input.invertersQuantity
         );
         return { issues };
       }),
