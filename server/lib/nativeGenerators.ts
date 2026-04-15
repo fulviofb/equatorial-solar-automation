@@ -27,6 +27,16 @@ function getEstadoExtenso(uf: string): string {
   return estados[uf?.toUpperCase()] || uf;
 }
 
+/**
+ * Formata data no padrão do template: "JULHO – 2025"
+ * (mês em maiúsculas + travessão + ano)
+ */
+function formatDataExtenso(): string {
+  const raw = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  // "julho de 2026" → "JULHO – 2026"
+  return raw.toUpperCase().replace(' DE ', ' \u2013 ');
+}
+
 function gerarDescricaoSistema(modules: any[], inverters: any[]): string {
   const modDesc = modules.length > 0
     ? `${modules.reduce((acc, m) => acc + (m.qtd || 0), 0)} módulos ${modules[0].fabricante} de ${modules[0].potencia}W`
@@ -43,7 +53,6 @@ function gerarDescricaoSistema(modules: any[], inverters: any[]): string {
  */
 function setCellValue(ws: ExcelJS.Worksheet, cellRef: string, value: any) {
   const cell = ws.getCell(cellRef);
-  // Se é célula mesclada não-mestre, buscar a mestre pelo tipo da instância
   if ((cell as any).isMerged && (cell as any).master) {
     (cell as any).master.value = value;
   } else {
@@ -119,10 +128,10 @@ export const NativeGenerator = {
           data.modules.forEach((mod: any, idx: number) => {
             if (idx >= 10) return;
             const row = 7 + idx;
-            const potW   = Number(mod.potencia || 0);
-            const qtd    = Number(mod.qtd || 0);
-            const totalKwp = (potW * qtd) / 1000;
-            const area     = Number(mod.area || 0);
+            const potW      = Number(mod.potencia || 0);
+            const qtd       = Number(mod.qtd || 0);
+            const totalKwp  = (potW * qtd) / 1000;
+            const area      = Number(mod.area || 0);
             const totalArea = area * qtd;
 
             setCellValue(ws0, `C${row}`, idx + 1);
@@ -139,8 +148,8 @@ export const NativeGenerator = {
         if (Array.isArray(data.inverters)) {
           data.inverters.forEach((inv: any, idx: number) => {
             if (idx >= 30) return;
-            const row = 22 + idx;
-            const potKw = Number(inv.potencia_nominal_kw || inv.potencia || 0);
+            const row    = 22 + idx;
+            const potKw  = Number(inv.potencia_nominal_kw || inv.potencia || 0);
             const tensao = Number(inv.tensao_ca_nominal || inv.tensao || 220);
 
             setCellValue(ws0, `C${row}`, idx + 1);
@@ -158,48 +167,27 @@ export const NativeGenerator = {
 
       // ── ABA 1: Dados Cadastrais ────────────────────────────────────────────
       //
-      // Mapeamento validado contra template oficial:
-      //
       //  DADOS DO CLIENTE
       //    C10  = Nome do cliente
       //    R10  = CPF/CNPJ
-      //    AC9  = RG (célula mestre da região mesclada)
+      //    AC9  = RG
       //    C13  = Endereço completo
-      //    D15  = CEP
-      //    I15  = Cidade
-      //    Q15  = UF
-      //    V15  = E-mail
-      //    T13  = Celular / Telefone
+      //    D15  = CEP      I15 = Cidade     Q15 = UF
+      //    V15  = E-mail   T13 = Celular
       //
-      //  DADOS DA UNIDADE CONSUMIDORA
-      //    Z17  = Número do contrato/conta
-      //    F29  = Carga declarada (kW)
-      //    P29  = Disjuntor de entrada (A)
-      //    F31  = Tipo de ramal (AÉREO / SUBTERRÂNEO)
-      //    H33  = Número do poste mais próximo
-      //    L33  = Coordenada X (latitude)
-      //    T33  = Coordenada Y (longitude)
-      //    F27  = Tensão de atendimento (V)
-      //    L27  = Tipo de ligação (MONOFÁSICO / BIFÁSICO / TRIFÁSICO)
+      //  UNIDADE CONSUMIDORA
+      //    Z17 = Conta contrato   F29 = Carga declarada   P29 = Disjuntor
+      //    F31 = Tipo ramal       H33 = Poste             L33 / T33 = Coords
+      //    F27 = Tensão           L27 = Tipo ligação
       //
       //  GERAÇÃO DISTRIBUÍDA
-      //    G49  = Tipo de fonte primária (SOLAR FOTOVOLTAICA)
-      //    G51  = Tipo de geração (EMPREGANDO CONVERSOR ELETRÔNICO/INVERSOR)
-      //    G53  = Classificação / enquadramento (AUTOCONSUMO LOCAL etc.)
-      //    AC53 = Potência total instalada (kWp)
-      //    AC57 = Potência total dos inversores (kW)
+      //    G49 = Fonte primária   G51 = Tipo geração   G53 = Enquadramento
+      //    AC53 = kWp total       AC57 = kW inversores
       //
       //  RESPONSÁVEL TÉCNICO
-      //    C38  = Nome
-      //    M38  = Título / especialidade
-      //    Y38  = Nº de registro (CREA/CFT)
-      //    C41  = E-mail
-      //    S41  = Celular / telefone
-      //    C44  = Endereço
-      //    P44  = Cidade
-      //    AB43 = UF
-      //    W44  = CEP
-      //    H44  = Bairro
+      //    C38 = Nome    M38 = Título    Y38 = Registro
+      //    C41 = Email   S41 = Celular
+      //    C44 = Endereço   H44 = Bairro   P44 = Cidade   AB43 = UF   W44 = CEP
 
       const ws1 = workbook.worksheets[1];
       if (ws1) {
@@ -228,7 +216,7 @@ export const NativeGenerator = {
         set('V15', 'email');
         set('T13', 'celular');
 
-        // Dados da unidade consumidora
+        // Unidade consumidora
         set('Z17', 'conta_contrato');
         set('F29', 'carga_declarada');
         set('P29', 'disjuntor_entrada');
@@ -253,10 +241,10 @@ export const NativeGenerator = {
         set('C41', 'resp_tecnico_email');
         set('S41', 'resp_tecnico_celular');
         set('C44', 'resp_tecnico_endereco');
+        set('H44', 'resp_tecnico_bairro');
         set('P44', 'resp_tecnico_cidade');
         set('AB43', 'resp_tecnico_uf');
         set('W44', 'resp_tecnico_cep');
-        set('H44', 'resp_tecnico_bairro');
       }
 
       // Salvar arquivo
@@ -298,73 +286,75 @@ export const NativeGenerator = {
       });
 
       const templateData = {
-        nome_cliente:           data.nome_cliente || '',
-        rg:                     data.rg || '',
-        cpf_cnpj:               data.cpf_cnpj || '',
-        endereco:               data.endereco || '',
-        cidade:                 data.cidade || '',
-        uf:                     data.uf || '',
-        cep:                    data.cep || '',
-        cidade_uf:              `${data.cidade || ''} - ${data.uf || ''}`,
-        estado:                 getEstadoExtenso(data.uf || ''),
-        potencia_total_kw:      data.potencia_total_kw || '',
-        resp_tecnico_nome:      data.resp_tecnico_nome || '',
-        resp_tecnico_titulo:    data.resp_tecnico_titulo || '',
-        resp_tecnico_registro:  data.resp_tecnico_registro || '',
-        data_extenso:           new Date().toLocaleDateString('pt-BR', {
-          day: 'numeric', month: 'long', year: 'numeric',
-        }),
-        classe_uc:              data.classe_uc || 'Residencial',
-        conta_contrato:         data.conta_contrato || '',
-        coordenadas:            data.coordenadas || '',
-        coordenada_x:           data.coordenada_x || '',
-        coordenada_y:           data.coordenada_y || '',
-        numero_poste:           data.numero_poste || '',
-        estado_extenso:         getEstadoExtenso(data.uf || ''),
-        enquadramento:          data.enquadramento || '',
-        tensao_atendimento:     data.tensao_atendimento || '',
-        tipo_ligacao:           data.tipo_ligacao || '',
+        nome_cliente:             data.nome_cliente || '',
+        rg:                       data.rg || '',
+        cpf_cnpj:                 data.cpf_cnpj || '',
+        endereco:                 data.endereco || '',
+        cidade:                   data.cidade || '',
+        uf:                       data.uf || '',
+        cep:                      data.cep || '',
+        // Usa travessão (–) para manter padrão do template oficial
+        cidade_uf:                `${data.cidade || ''} \u2013 ${data.uf || ''}`,
+        estado:                   getEstadoExtenso(data.uf || ''),
+        estado_extenso:           getEstadoExtenso(data.uf || ''),
+        potencia_total_kw:        data.potencia_total_kw || '',
+        resp_tecnico_nome:        data.resp_tecnico_nome || '',
+        resp_tecnico_titulo:      data.resp_tecnico_titulo || '',
+        resp_tecnico_registro:    data.resp_tecnico_registro || '',
+        // Formato: "ABRIL – 2026" (mês maiúsculo + travessão + ano)
+        data_extenso:             formatDataExtenso(),
+        classe_uc:                data.classe_uc || 'Residencial',
+        conta_contrato:           data.conta_contrato || '',
+        coordenadas:              data.coordenadas || '',
+        coordenada_x:             data.coordenada_x || '',
+        coordenada_y:             data.coordenada_y || '',
+        numero_poste:             data.numero_poste || '',
+        enquadramento:            data.enquadramento || '',
+        tensao_atendimento:       data.tensao_atendimento || '',
+        tipo_ligacao:             data.tipo_ligacao || '',
         potencia_disponibilizada: data.potencia_disponibilizada || '',
-        carga_declarada:        data.carga_declarada || '',
+        carga_declarada:          data.carga_declarada || '',
 
-        // Módulos
-        modules:        data.modules || [],
-        mod_fabricante: data.modules?.[0]?.fabricante || '',
-        mod_modelo:     data.modules?.[0]?.modelo || '',
-        mod_potencia:   data.modules?.[0]?.potencia || '',
-        mod_voc:        data.modules?.[0]?.voc || '',
-        mod_isc:        data.modules?.[0]?.isc || '',
-        mod_vmpp:       data.modules?.[0]?.vmpp || '',
-        mod_impp:       data.modules?.[0]?.impp || '',
-        mod_eficiencia: data.modules?.[0]?.eficiencia || '',
+        // Arrays para loops no template
+        modules:  data.modules  || [],
+        inverters: data.inverters || [],
+
+        // Campos flat do primeiro módulo (para seções não-loop)
+        mod_fabricante:  data.modules?.[0]?.fabricante  || '',
+        mod_modelo:      data.modules?.[0]?.modelo      || '',
+        mod_potencia:    data.modules?.[0]?.potencia    || '',
+        mod_voc:         data.modules?.[0]?.voc         || '',
+        mod_isc:         data.modules?.[0]?.isc         || '',
+        mod_vmpp:        data.modules?.[0]?.vmpp        || '',
+        mod_impp:        data.modules?.[0]?.impp        || '',
+        mod_eficiencia:  data.modules?.[0]?.eficiencia  || '',
         mod_comprimento: data.modules?.[0]?.comprimento || '',
-        mod_largura:    data.modules?.[0]?.largura || '',
-        mod_area:       data.modules?.[0]?.area_fmt || '',
-        mod_peso:       data.modules?.[0]?.peso || '',
-        mod_quantidade: data.modules?.reduce((acc: number, m: any) => acc + (m.qtd || 0), 0) || 0,
+        mod_largura:     data.modules?.[0]?.largura     || '',
+        mod_area:        data.modules?.[0]?.area_fmt    || '',
+        mod_peso:        data.modules?.[0]?.peso        || '',
+        mod_quantidade:  data.modules?.reduce((acc: number, m: any) => acc + (m.qtd || 0), 0) || 0,
 
-        // Inversores
-        inverters:         data.inverters || [],
-        inv_fabricante:    data.inverters?.[0]?.fabricante || '',
-        inv_modelo:        data.inverters?.[0]?.modelo || '',
-        inv_quantidade:    data.inverters?.reduce((acc: number, i: any) => acc + (i.qtd || 0), 0) || 0,
-        inv_corrente_cc_max:     data.inverters?.[0]?.corrente_cc_max || '',
-        inv_corrente_ca_max:     data.inverters?.[0]?.corrente_ca_max || '',
-        inv_eficiencia_max:      data.inverters?.[0]?.eficiencia_max || '',
-        inv_eficiencia_eu:       data.inverters?.[0]?.eficiencia_eu || '',
-        inv_tipo_conexao:        data.inverters?.[0]?.tipo_conexao || '',
+        // Campos flat do primeiro inversor (para seções não-loop)
+        inv_fabricante:        data.inverters?.[0]?.fabricante        || '',
+        inv_modelo:            data.inverters?.[0]?.modelo            || '',
+        inv_quantidade:        data.inverters?.reduce((acc: number, i: any) => acc + (i.qtd || 0), 0) || 0,
+        inv_corrente_cc_max:   data.inverters?.[0]?.corrente_cc_max   || '',
+        inv_corrente_ca_max:   data.inverters?.[0]?.corrente_ca_max   || '',
+        inv_eficiencia_max:    data.inverters?.[0]?.eficiencia_max    || '',
+        inv_eficiencia_eu:     data.inverters?.[0]?.eficiencia_eu     || '',
+        inv_tipo_conexao:      data.inverters?.[0]?.tipo_conexao      || '',
         inv_potencia_nominal_kw: data.inverters?.[0]?.potencia_nominal_kw_fmt || '',
-        inv_potencia_max_cc:     data.inverters?.[0]?.potencia_max_cc || '',
-        inv_tensao_cc_max:       data.inverters?.[0]?.tensao_cc_max || '',
-        inv_tensao_mppt_max:     data.inverters?.[0]?.tensao_mppt_max || '',
-        inv_tensao_mppt_min:     data.inverters?.[0]?.tensao_mppt_min || '',
-        inv_tensao_partida:      data.inverters?.[0]?.tensao_partida || '',
-        inv_num_strings:         data.inverters?.[0]?.num_strings || '',
-        inv_num_mppt:            data.inverters?.[0]?.num_mppt || '',
-        inv_tensao_ca_nominal:   data.inverters?.[0]?.tensao_ca_nominal || '',
-        inv_frequencia:          data.inverters?.[0]?.frequencia || '',
-        inv_thd:                 data.inverters?.[0]?.thd || '',
-        inv_fator_potencia:      data.inverters?.[0]?.fator_potencia || '',
+        inv_potencia_max_cc:   data.inverters?.[0]?.potencia_max_cc   || '',
+        inv_tensao_cc_max:     data.inverters?.[0]?.tensao_cc_max     || '',
+        inv_tensao_mppt_max:   data.inverters?.[0]?.tensao_mppt_max   || '',
+        inv_tensao_mppt_min:   data.inverters?.[0]?.tensao_mppt_min   || '',
+        inv_tensao_partida:    data.inverters?.[0]?.tensao_partida    || '',
+        inv_num_strings:       data.inverters?.[0]?.num_strings       || '',
+        inv_num_mppt:          data.inverters?.[0]?.num_mppt          || '',
+        inv_tensao_ca_nominal: data.inverters?.[0]?.tensao_ca_nominal || '',
+        inv_frequencia:        data.inverters?.[0]?.frequencia        || '',
+        inv_thd:               data.inverters?.[0]?.thd               || '',
+        inv_fator_potencia:    data.inverters?.[0]?.fator_potencia    || '',
 
         descricao_sistema: gerarDescricaoSistema(data.modules || [], data.inverters || []),
       };
