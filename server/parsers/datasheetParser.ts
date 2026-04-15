@@ -47,9 +47,15 @@ export interface InverterDatasheetData {
 }
 
 /**
- * Extrai texto de PDF usando pdftotext (dev) ou LLM com file_url (produção)
+ * Extrai texto de PDF usando a seguinte cadeia de fallbacks:
+ * 1. pdftotext (binário do sistema — disponível em dev/Linux)
+ * 2. pdfjs-dist (biblioteca JavaScript — funciona em qualquer ambiente Node.js)
+ *
+ * Não usa mais file_url/LLM para extração de texto, pois o DeepSeek via
+ * OpenRouter não suporta leitura nativa de PDFs.
  */
 async function extractPdfText(pdfBuffer: Buffer): Promise<string> {
+  // ── 1. Tentar pdftotext ───────────────────────────────────────────────────
   const tempId = randomBytes(16).toString('hex');
   const tempPdfPath = join(tmpdir(), `pdf-${tempId}.pdf`);
 
@@ -58,57 +64,59 @@ async function extractPdfText(pdfBuffer: Buffer): Promise<string> {
 
     try {
       const { stdout } = await execAsync(`pdftotext "${tempPdfPath}" -`);
-      if (stdout && stdout.trim().length > 0) {
+      if (stdout && stdout.trim().length > 50) {
+        console.log(`[Datasheet Parser] Texto extraído via pdftotext (${stdout.length} chars)`);
         return stdout;
       }
-      throw new Error('pdftotext retornou texto vazio');
-    } catch (_pdfError) {
-      console.log('[Datasheet Parser] pdftotext não disponível, usando LLM com file_url');
-
-      const base64Pdf = pdfBuffer.toString('base64');
-      const dataUrl = `data:application/pdf;base64,${base64Pdf}`;
-
-      const response = await invokeLLM({
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'file_url',
-                file_url: {
-                  url: dataUrl,
-                  mime_type: 'application/pdf',
-                },
-              },
-              {
-                type: 'text',
-                text: 'Extraia todo o conteúdo textual deste datasheet PDF de equipamento solar fotovoltaico. Retorne apenas o texto bruto, sem formatação adicional ou análise.',
-              },
-            ],
-          },
-        ],
-      });
-
-      const content = response.choices[0]?.message?.content;
-      if (typeof content === 'string') return content;
-
-      if (Array.isArray(content)) {
-        return content
-          .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
-          .map(part => part.text)
-          .join('\n');
-      }
-
-      return '';
+    } catch (_) {
+      // pdftotext não disponível — continuar para próximo fallback
     }
   } finally {
     try { await unlink(tempPdfPath); } catch (_) { /* ignorar */ }
+  }
+
+  // ── 2. Usar pdfjs-dist (import dinâmico para evitar problemas de inicialização) ──
+  try {
+    console.log('[Datasheet Parser] Usando pdfjs-dist para extração de texto');
+
+    // Import dinâmico — evita o bug de require no top-level que causava ENOENT
+    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs' as any);
+
+    // Desabilitar worker (não disponível em ambiente serverless)
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+
+    const loadingTask = pdfjsLib.getDocument({
+      data: new Uint8Array(pdfBuffer),
+      useWorkerFetch: false,
+      isEvalSupported: false,
+      useSystemFonts: true,
+    });
+
+    const pdf = await loadingTask.promise;
+    const texts: string[] = [];
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const pageText = content.items
+        .map((item: any) => item.str || '')
+        .join(' ');
+      texts.push(pageText);
+    }
+
+    const fullText = texts.join('\n');
+    console.log(`[Datasheet Parser] Texto extraído via pdfjs-dist (${fullText.length} chars)`);
+    return fullText;
+
+  } catch (pdfError) {
+    console.error('[Datasheet Parser] pdfjs-dist falhou:', pdfError);
+    throw new Error('Não foi possível extrair texto do PDF. Verifique se o arquivo é um PDF válido e não está protegido por senha.');
   }
 }
 
 /**
  * Detecta o tipo de datasheet (módulo ou inversor) com base em sistema de pontuação.
- * Cobre português e inglês, incluindo microinversores (Tsuness, Hoymiles, APsystems etc.).
+ * Cobre português e inglês, incluindo microinversores.
  */
 function detectDatasheetType(text: string): 'module' | 'inverter' | null {
   const inverterSignals = [
@@ -170,43 +178,36 @@ function detectDatasheetType(text: string): 'module' | 'inverter' | null {
   if (inverterScore > moduleScore) return 'inverter';
   if (moduleScore > inverterScore) return 'module';
 
-  // Empate: microinversor tem precedência
   if (/microinversor|sa[ií]da\s*\[?ca\]?/i.test(text)) return 'inverter';
 
   return null;
 }
 
 /**
- * Pós-processa os dados extraídos do módulo:
- * - Remove tolerâncias de dimensões: "2384(±2)" → "2384"
- * - Calcula área se não informada: comprimento × largura (convertido de mm para m²)
- * - Remove unidades residuais dos campos numéricos
+ * Pós-processamento dos dados de módulo:
+ * - Remove tolerâncias: "2384(±2)" → "2384"
+ * - Remove unidades residuais
+ * - Calcula área a partir de comprimento × largura (mm → m²)
  */
 function postProcessModuleData(data: any): any {
   const clean = (val: string | undefined): string | undefined => {
     if (!val) return val;
-    // Remove tolerâncias tipo "(±2)", "(+5/-0)", "±2"
     let v = String(val).replace(/\s*\(±[\d.]+\)/g, '').replace(/±[\d.]+/g, '').trim();
-    // Remove unidades residuais comuns
     v = v.replace(/\s*(mm|m²|kg|w|v|a|%)\s*$/i, '').trim();
-    // Se ficou com múltiplos valores separados por "/" ou "~", pegar o primeiro
     if (v.includes('/')) v = v.split('/')[0].trim();
     return v;
   };
 
   const result = { ...data };
 
-  // Limpar campos numéricos
   for (const key of ['voc', 'isc', 'vmpp', 'impp', 'efficiency', 'length', 'width', 'weight']) {
     if (result[key]) result[key] = clean(result[key]);
   }
 
-  // Calcular área se não vier do datasheet (módulos raramente listam área diretamente)
   if (!result.area && result.length && result.width) {
     const l = parseFloat(result.length);
     const w = parseFloat(result.width);
     if (!isNaN(l) && !isNaN(w) && l > 0 && w > 0) {
-      // Dimensões em mm → m²
       const area = (l / 1000) * (w / 1000);
       result.area = area.toFixed(3);
       console.log(`[Datasheet Parser] Área calculada: ${l}mm × ${w}mm = ${result.area} m²`);
@@ -217,7 +218,7 @@ function postProcessModuleData(data: any): any {
 }
 
 /**
- * Extrai dados de datasheet usando LLM com JSON schema
+ * Extrai especificações técnicas usando LLM com JSON schema estruturado
  */
 async function extractDataWithLLM(text: string, type: 'module' | 'inverter'): Promise<any> {
   const schema = type === 'module' ? {
@@ -229,43 +230,43 @@ async function extractDataWithLLM(text: string, type: 'module' | 'inverter'): Pr
       },
       model: {
         type: 'string',
-        description: 'Exact model code / código do modelo. Ex: "ERA-HJT-66HD-730M", "CS3W-450P". If the datasheet lists multiple power variants (700W, 705W ... 730W), pick the highest power model.',
+        description: 'Exact model code. If multiple power variants (700W...730W), pick the highest. Ex: "ERA-HJT-66HD-730M"',
       },
       nominalPower: {
         type: 'integer',
-        description: 'Maximum power / Potência máxima em Watts (STC). Integer only, no units. If the datasheet lists multiple models, use the highest Wp value (e.g. 730, not 700).',
+        description: 'Maximum power in Watts (STC). If multiple models, use the highest Wp (e.g. 730).',
       },
       voc: {
         type: 'string',
-        description: 'Open circuit voltage / Tensão Voc in Volts. Number only (e.g. "49.55"). Use STC values. If multiple models listed, use the value for the highest Wp model.',
+        description: 'Open circuit voltage Voc in Volts, STC, number only (e.g. "49.55"). Use highest Wp model.',
       },
       isc: {
         type: 'string',
-        description: 'Short circuit current / Corrente Isc in Amperes. Number only (e.g. "18.65"). Use STC values. If multiple models listed, use the value for the highest Wp model.',
+        description: 'Short circuit current Isc in Amperes, STC, number only (e.g. "18.65"). Use highest Wp model.',
       },
       vmpp: {
         type: 'string',
-        description: 'Maximum power voltage / Tensão Vmpp in Volts. Number only (e.g. "41.36"). Use STC values. If multiple models listed, use the value for the highest Wp model.',
+        description: 'Max power voltage Vmpp in Volts, STC, number only (e.g. "41.36"). Use highest Wp model.',
       },
       impp: {
         type: 'string',
-        description: 'Maximum power current / Corrente Impp in Amperes. Number only (e.g. "17.65"). Use STC values. If multiple models listed, use the value for the highest Wp model.',
+        description: 'Max power current Impp in Amperes, STC, number only (e.g. "17.65"). Use highest Wp model.',
       },
       efficiency: {
         type: 'string',
-        description: 'Module efficiency / Eficiência do módulo in %. Number only without % sign (e.g. "23.52"). If multiple models, use the highest Wp value.',
+        description: 'Module efficiency in %, number only without % (e.g. "23.52"). Use highest Wp model.',
       },
       length: {
         type: 'string',
-        description: 'Module length / Comprimento in mm. Number only, no tolerances (e.g. "2384" not "2384(±2)"). Usually the larger dimension.',
+        description: 'Module length in mm, number only, no tolerances (e.g. "2384"). Larger dimension.',
       },
       width: {
         type: 'string',
-        description: 'Module width / Largura in mm. Number only, no tolerances (e.g. "1303" not "1303(±2)"). Usually the smaller dimension.',
+        description: 'Module width in mm, number only, no tolerances (e.g. "1303"). Smaller dimension.',
       },
       weight: {
         type: 'string',
-        description: 'Module weight / Peso in kg. Number only (e.g. "32.5"). If multiple values listed (e.g. "32.5 / 33.5 / 34.5"), use the first/lightest value.',
+        description: 'Module weight in kg, number only (e.g. "32.5"). If multiple values, use first.',
       },
     },
     required: [],
@@ -274,25 +275,25 @@ async function extractDataWithLLM(text: string, type: 'module' | 'inverter'): Pr
     type: 'object',
     properties: {
       manufacturer: { type: 'string', description: 'Fabricante do inversor' },
-      model: { type: 'string', description: 'Modelo exato do inversor (ex: TSOL-MX3000D). Se houver múltiplos modelos, usar o do título ou o mais proeminente.' },
-      nominalPowerAC: { type: 'integer', description: 'Potência nominal AC em Watts — "Potência Máxima Nominal de Saída" / "Maximum Output Power" (apenas o número). Para microinversores, é a potência de SAÍDA CA, não a de entrada CC.' },
-      nominalPowerDC: { type: 'integer', description: 'Potência nominal DC de entrada em Watts (apenas o número)' },
-      maxPowerDC: { type: 'integer', description: 'Potência máxima DC em Watts (apenas o número)' },
-      maxVoltageDC: { type: 'string', description: 'Tensão máxima de entrada DC em Volts (apenas o número)' },
-      maxCurrentDC: { type: 'string', description: 'Corrente de curto-circuito / máxima de entrada em Amperes (apenas o número)' },
-      mpptVoltageMax: { type: 'string', description: 'Tensão máxima da faixa MPPT em Volts (parte superior do range, ex: "60" de "16~60")' },
-      mpptVoltageMin: { type: 'string', description: 'Tensão mínima da faixa MPPT em Volts (parte inferior do range, ex: "16" de "16~60")' },
-      startupVoltageDC: { type: 'string', description: 'Tensão de partida em Volts (apenas o número)' },
+      model: { type: 'string', description: 'Modelo exato. Se múltiplos modelos, usar o do título ou mais proeminente (ex: TSOL-MX3000D).' },
+      nominalPowerAC: { type: 'integer', description: 'Potência nominal AC em Watts — saída CA. Para microinversores: é a potência de SAÍDA, não de entrada DC.' },
+      nominalPowerDC: { type: 'integer', description: 'Potência nominal DC de entrada em Watts' },
+      maxPowerDC: { type: 'integer', description: 'Potência máxima DC em Watts' },
+      maxVoltageDC: { type: 'string', description: 'Tensão máxima de entrada DC em Volts (número apenas)' },
+      maxCurrentDC: { type: 'string', description: 'Corrente de curto-circuito / máxima de entrada em Amperes (número apenas)' },
+      mpptVoltageMax: { type: 'string', description: 'Tensão máxima MPPT em Volts (ex: "60" de "16~60")' },
+      mpptVoltageMin: { type: 'string', description: 'Tensão mínima MPPT em Volts (ex: "16" de "16~60")' },
+      startupVoltageDC: { type: 'string', description: 'Tensão de partida em Volts' },
       numberOfMppt: { type: 'integer', description: 'Quantidade de MPPTs' },
       numberOfStrings: { type: 'integer', description: 'Quantidade de entradas CC / strings' },
       nominalVoltageAC: { type: 'string', description: 'Tensão nominal de saída AC em Volts (ex: "220")' },
-      nominalFrequency: { type: 'string', description: 'Frequência nominal em Hz (apenas o número)' },
-      maxCurrentAC: { type: 'string', description: 'Corrente máxima de saída CA em Amperes (apenas o número)' },
+      nominalFrequency: { type: 'string', description: 'Frequência nominal em Hz' },
+      maxCurrentAC: { type: 'string', description: 'Corrente máxima de saída CA em Amperes' },
       powerFactor: { type: 'string', description: 'Fator de potência (ex: ">0.99")' },
       thdCurrent: { type: 'string', description: 'THD de corrente (ex: "<3%")' },
-      maxEfficiency: { type: 'string', description: 'Eficiência máxima em % (apenas o número, sem %)' },
-      euEfficiency: { type: 'string', description: 'Eficiência EU em % (apenas o número, sem %)' },
-      mpptEfficiency: { type: 'string', description: 'Eficiência MPPT em % (apenas o número, sem %)' },
+      maxEfficiency: { type: 'string', description: 'Eficiência máxima em % (número sem %)' },
+      euEfficiency: { type: 'string', description: 'Eficiência EU em % (número sem %)' },
+      mpptEfficiency: { type: 'string', description: 'Eficiência MPPT em % (número sem %)' },
     },
     required: [],
     additionalProperties: false,
@@ -308,10 +309,11 @@ async function extractDataWithLLM(text: string, type: 'module' | 'inverter'): Pr
 Rules:
 - Extract ONLY the requested fields. Omit fields not found.
 - For numeric fields, return ONLY the number — no units, no tolerances, no symbols.
-- If a datasheet has a table with multiple power variants (e.g. 700W, 705W ... 730W), always extract data for the HIGHEST power model in the range.
+- If a datasheet has a table with multiple power variants (e.g. 700W, 705W ... 730W), always extract data for the HIGHEST power model.
 - Strip tolerances from dimensions: "2384(±2)" → "2384".
 - For weight with multiple values (e.g. "32.5 / 33.5 / 34.5"), use the first value.
-- For microinverters: nominalPowerAC = AC output power (not DC input).`,
+- For microinverters: nominalPowerAC = AC output power (not DC input power).
+- Use STC (Standard Test Conditions) values for module electrical parameters.`,
       },
       {
         role: 'user',
@@ -334,7 +336,6 @@ Rules:
   const contentStr = typeof content === 'string' ? content : JSON.stringify(content);
   let parsed = JSON.parse(contentStr);
 
-  // Pós-processamento específico para módulos
   if (type === 'module') {
     parsed = postProcessModuleData(parsed);
   }
@@ -343,14 +344,14 @@ Rules:
 }
 
 /**
- * Detecta automaticamente o tipo de datasheet e extrai os dados
+ * Detecta automaticamente o tipo de datasheet e extrai os dados técnicos.
  */
 export async function parseDatasheet(pdfBuffer: Buffer): Promise<{ type: 'module' | 'inverter'; data: any }> {
   try {
     const text = await extractPdfText(pdfBuffer);
 
     if (!text || text.trim().length === 0) {
-      throw new Error('Não foi possível extrair texto do PDF');
+      throw new Error('Não foi possível extrair texto do PDF. O arquivo pode estar vazio ou protegido.');
     }
 
     const type = detectDatasheetType(text);
