@@ -53,7 +53,7 @@ export interface InverterDatasheetData {
 }
 
 /**
- * Extrai texto de PDF usando pdftotext (desenvolvimento) ou fallback para LLM (produção)
+ * Extrai texto de PDF usando pdftotext (desenvolvimento) ou fallback via LLM com file_url (produção)
  */
 async function extractPdfText(pdfBuffer: Buffer): Promise<string> {
   const tempId = randomBytes(16).toString('hex');
@@ -66,12 +66,14 @@ async function extractPdfText(pdfBuffer: Buffer): Promise<string> {
     // Tentar usar pdftotext (disponível em desenvolvimento)
     try {
       const { stdout } = await execAsync(`pdftotext "${tempPdfPath}" -`);
-      return stdout;
+      if (stdout && stdout.trim().length > 0) {
+        return stdout;
+      }
+      throw new Error('pdftotext retornou texto vazio');
     } catch (pdfError) {
-      // pdftotext não disponível, usar LLM como fallback
-      console.log('[Datasheet Parser] pdftotext not available, using LLM fallback');
+      // pdftotext não disponível ou falhou — usar LLM com file_url (suporte nativo a PDF)
+      console.log('[Datasheet Parser] pdftotext não disponível, usando LLM com file_url');
 
-      // Converter PDF para base64 para enviar ao LLM
       const base64Pdf = pdfBuffer.toString('base64');
       const dataUrl = `data:application/pdf;base64,${base64Pdf}`;
 
@@ -81,28 +83,39 @@ async function extractPdfText(pdfBuffer: Buffer): Promise<string> {
             role: 'user',
             content: [
               {
-                type: 'image_url',
-                image_url: {
-                  url: dataUrl
-                }
+                type: 'file_url',
+                file_url: {
+                  url: dataUrl,
+                  mime_type: 'application/pdf',
+                },
               },
               {
                 type: 'text',
-                text: 'Extract all text content from this PDF datasheet. Return only the raw text, no formatting or analysis.'
-              }
-            ] as any
-          }
-        ]
+                text: 'Extraia todo o conteúdo textual deste datasheet PDF de equipamento solar fotovoltaico. Retorne apenas o texto bruto, sem formatação adicional ou análise.',
+              },
+            ],
+          },
+        ],
       });
 
       const content = response.choices[0]?.message?.content;
-      return typeof content === 'string' ? content : '';
+      if (typeof content === 'string') return content;
+
+      // Se o modelo retornou array de partes, concatenar as partes de texto
+      if (Array.isArray(content)) {
+        return content
+          .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
+          .map(part => part.text)
+          .join('\n');
+      }
+
+      return '';
     }
   } finally {
     // Limpar arquivo temporário
     try {
       await unlink(tempPdfPath);
-    } catch (e) {
+    } catch (_) {
       // Ignorar erro de limpeza
     }
   }
@@ -202,7 +215,6 @@ export async function parseDatasheet(pdfBuffer: Buffer): Promise<{ type: 'module
     }
 
     // Detectar tipo baseado em palavras-chave
-    const textLower = text.toLowerCase();
     const isModule = /(?:solar panel|photovoltaic module|módulo fotovoltaico|painel solar|solar cell)/i.test(text);
     const isInverter = /(?:inverter|inversor|mppt|grid.?tied|string inverter|micro.?inverter)/i.test(text);
 
@@ -212,7 +224,7 @@ export async function parseDatasheet(pdfBuffer: Buffer): Promise<{ type: 'module
     } else if (isInverter) {
       type = 'inverter';
     } else {
-      console.error('[Datasheet Parser] Texto retornado pelo LLM que não deu match:', text.substring(0, 1000));
+      console.error('[Datasheet Parser] Texto retornado que não deu match:', text.substring(0, 1000));
       throw new Error('Não foi possível identificar o tipo de datasheet (módulo ou inversor)');
     }
 
