@@ -48,20 +48,19 @@ export interface InverterDatasheetData {
 
 /**
  * Extrai texto de PDF usando a seguinte cadeia de fallbacks:
- * 1. pdftotext (binário do sistema — disponível em dev/Linux)
- * 2. pdfjs-dist (biblioteca JavaScript — funciona em qualquer ambiente Node.js)
+ * 1. pdftotext (binário — disponível em dev)
+ * 2. pdf-parse (biblioteca JS — usa import dinâmico para evitar o bug do require no top-level)
  *
- * Não usa mais file_url/LLM para extração de texto, pois o DeepSeek via
- * OpenRouter não suporta leitura nativa de PDFs.
+ * Nota: o import dinâmico de pdf-parse contorna o ENOENT que ocorria quando
+ * o módulo era importado no top-level e tentava ler arquivos de teste na inicialização.
  */
 async function extractPdfText(pdfBuffer: Buffer): Promise<string> {
-  // ── 1. Tentar pdftotext ───────────────────────────────────────────────────
   const tempId = randomBytes(16).toString('hex');
   const tempPdfPath = join(tmpdir(), `pdf-${tempId}.pdf`);
 
+  // ── 1. Tentar pdftotext ──────────────────────────────────────────────────
   try {
     await writeFile(tempPdfPath, pdfBuffer);
-
     try {
       const { stdout } = await execAsync(`pdftotext "${tempPdfPath}" -`);
       if (stdout && stdout.trim().length > 50) {
@@ -69,54 +68,48 @@ async function extractPdfText(pdfBuffer: Buffer): Promise<string> {
         return stdout;
       }
     } catch (_) {
-      // pdftotext não disponível — continuar para próximo fallback
+      // pdftotext não disponível
     }
   } finally {
     try { await unlink(tempPdfPath); } catch (_) { /* ignorar */ }
   }
 
-  // ── 2. Usar pdfjs-dist (import dinâmico para evitar problemas de inicialização) ──
+  // ── 2. Usar pdf-parse via import dinâmico ─────────────────────────────────
+  // O import dinâmico evita que pdf-parse tente ler arquivos de teste na
+  // inicialização do servidor (o que causava o erro ENOENT em produção).
   try {
-    console.log('[Datasheet Parser] Usando pdfjs-dist para extração de texto');
+    console.log('[Datasheet Parser] Usando pdf-parse para extração de texto');
 
-    // Import dinâmico — evita o bug de require no top-level que causava ENOENT
-    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs' as any);
+    // Import dinâmico — só executa quando necessário, não no carregamento do módulo
+    const pdfParse = await import('pdf-parse/lib/pdf-parse.js' as any);
+    const fn = pdfParse.default || pdfParse;
 
-    // Desabilitar worker (não disponível em ambiente serverless)
-    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-
-    const loadingTask = pdfjsLib.getDocument({
-      data: new Uint8Array(pdfBuffer),
-      useWorkerFetch: false,
-      isEvalSupported: false,
-      useSystemFonts: true,
+    const result = await fn(pdfBuffer, {
+      // Desabilitar renderização de página (não precisamos do layout, só do texto)
+      max: 0,
     });
 
-    const pdf = await loadingTask.promise;
-    const texts: string[] = [];
+    const text = result.text || '';
+    console.log(`[Datasheet Parser] Texto extraído via pdf-parse (${text.length} chars)`);
 
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      const pageText = content.items
-        .map((item: any) => item.str || '')
-        .join(' ');
-      texts.push(pageText);
+    if (text.trim().length > 50) {
+      return text;
     }
 
-    const fullText = texts.join('\n');
-    console.log(`[Datasheet Parser] Texto extraído via pdfjs-dist (${fullText.length} chars)`);
-    return fullText;
+    throw new Error('pdf-parse retornou texto insuficiente');
 
-  } catch (pdfError) {
-    console.error('[Datasheet Parser] pdfjs-dist falhou:', pdfError);
-    throw new Error('Não foi possível extrair texto do PDF. Verifique se o arquivo é um PDF válido e não está protegido por senha.');
+  } catch (parseError) {
+    console.error('[Datasheet Parser] pdf-parse falhou:', parseError);
+    throw new Error(
+      'Não foi possível extrair texto do PDF. ' +
+      'Verifique se o arquivo é um PDF válido e contém texto pesquisável (não é imagem escaneada).'
+    );
   }
 }
 
 /**
- * Detecta o tipo de datasheet (módulo ou inversor) com base em sistema de pontuação.
- * Cobre português e inglês, incluindo microinversores.
+ * Detecta o tipo de datasheet (módulo ou inversor) por sistema de pontuação.
+ * Cobre português e inglês, incluindo microinversores brasileiros.
  */
 function detectDatasheetType(text: string): 'module' | 'inverter' | null {
   const inverterSignals = [
@@ -179,7 +172,6 @@ function detectDatasheetType(text: string): 'module' | 'inverter' | null {
   if (moduleScore > inverterScore) return 'module';
 
   if (/microinversor|sa[ií]da\s*\[?ca\]?/i.test(text)) return 'inverter';
-
   return null;
 }
 
@@ -199,7 +191,6 @@ function postProcessModuleData(data: any): any {
   };
 
   const result = { ...data };
-
   for (const key of ['voc', 'isc', 'vmpp', 'impp', 'efficiency', 'length', 'width', 'weight']) {
     if (result[key]) result[key] = clean(result[key]);
   }
@@ -208,8 +199,7 @@ function postProcessModuleData(data: any): any {
     const l = parseFloat(result.length);
     const w = parseFloat(result.width);
     if (!isNaN(l) && !isNaN(w) && l > 0 && w > 0) {
-      const area = (l / 1000) * (w / 1000);
-      result.area = area.toFixed(3);
+      result.area = ((l / 1000) * (w / 1000)).toFixed(3);
       console.log(`[Datasheet Parser] Área calculada: ${l}mm × ${w}mm = ${result.area} m²`);
     }
   }
@@ -217,57 +207,21 @@ function postProcessModuleData(data: any): any {
   return result;
 }
 
-/**
- * Extrai especificações técnicas usando LLM com JSON schema estruturado
- */
 async function extractDataWithLLM(text: string, type: 'module' | 'inverter'): Promise<any> {
   const schema = type === 'module' ? {
     type: 'object',
     properties: {
-      manufacturer: {
-        type: 'string',
-        description: 'Company name / fabricante. Ex: "ERA Solar", "Canadian Solar", "Jinko Solar"',
-      },
-      model: {
-        type: 'string',
-        description: 'Exact model code. If multiple power variants (700W...730W), pick the highest. Ex: "ERA-HJT-66HD-730M"',
-      },
-      nominalPower: {
-        type: 'integer',
-        description: 'Maximum power in Watts (STC). If multiple models, use the highest Wp (e.g. 730).',
-      },
-      voc: {
-        type: 'string',
-        description: 'Open circuit voltage Voc in Volts, STC, number only (e.g. "49.55"). Use highest Wp model.',
-      },
-      isc: {
-        type: 'string',
-        description: 'Short circuit current Isc in Amperes, STC, number only (e.g. "18.65"). Use highest Wp model.',
-      },
-      vmpp: {
-        type: 'string',
-        description: 'Max power voltage Vmpp in Volts, STC, number only (e.g. "41.36"). Use highest Wp model.',
-      },
-      impp: {
-        type: 'string',
-        description: 'Max power current Impp in Amperes, STC, number only (e.g. "17.65"). Use highest Wp model.',
-      },
-      efficiency: {
-        type: 'string',
-        description: 'Module efficiency in %, number only without % (e.g. "23.52"). Use highest Wp model.',
-      },
-      length: {
-        type: 'string',
-        description: 'Module length in mm, number only, no tolerances (e.g. "2384"). Larger dimension.',
-      },
-      width: {
-        type: 'string',
-        description: 'Module width in mm, number only, no tolerances (e.g. "1303"). Smaller dimension.',
-      },
-      weight: {
-        type: 'string',
-        description: 'Module weight in kg, number only (e.g. "32.5"). If multiple values, use first.',
-      },
+      manufacturer: { type: 'string', description: 'Company name / fabricante. Ex: "ERA Solar", "Canadian Solar"' },
+      model: { type: 'string', description: 'Exact model code. If multiple power variants (700W...730W), pick the highest. Ex: "ERA-HJT-66HD-730M"' },
+      nominalPower: { type: 'integer', description: 'Maximum power in Watts (STC). If multiple models, use the highest Wp (e.g. 730).' },
+      voc: { type: 'string', description: 'Open circuit voltage Voc in Volts, STC, number only (e.g. "49.55"). Highest Wp model.' },
+      isc: { type: 'string', description: 'Short circuit current Isc in Amperes, STC, number only (e.g. "18.65"). Highest Wp model.' },
+      vmpp: { type: 'string', description: 'Max power voltage Vmpp in Volts, STC, number only (e.g. "41.36"). Highest Wp model.' },
+      impp: { type: 'string', description: 'Max power current Impp in Amperes, STC, number only (e.g. "17.65"). Highest Wp model.' },
+      efficiency: { type: 'string', description: 'Module efficiency in %, number only without % (e.g. "23.52"). Highest Wp model.' },
+      length: { type: 'string', description: 'Module length in mm, number only, no tolerances (e.g. "2384"). Larger dimension.' },
+      width: { type: 'string', description: 'Module width in mm, number only, no tolerances (e.g. "1303"). Smaller dimension.' },
+      weight: { type: 'string', description: 'Module weight in kg, number only (e.g. "32.5"). If multiple values, use first.' },
     },
     required: [],
     additionalProperties: false,
@@ -275,8 +229,8 @@ async function extractDataWithLLM(text: string, type: 'module' | 'inverter'): Pr
     type: 'object',
     properties: {
       manufacturer: { type: 'string', description: 'Fabricante do inversor' },
-      model: { type: 'string', description: 'Modelo exato. Se múltiplos modelos, usar o do título ou mais proeminente (ex: TSOL-MX3000D).' },
-      nominalPowerAC: { type: 'integer', description: 'Potência nominal AC em Watts — saída CA. Para microinversores: é a potência de SAÍDA, não de entrada DC.' },
+      model: { type: 'string', description: 'Modelo exato. Se múltiplos modelos, usar o do título (ex: TSOL-MX3000D).' },
+      nominalPowerAC: { type: 'integer', description: 'Potência nominal AC em Watts — saída CA. Para microinversores: potência de SAÍDA, não de entrada DC.' },
       nominalPowerDC: { type: 'integer', description: 'Potência nominal DC de entrada em Watts' },
       maxPowerDC: { type: 'integer', description: 'Potência máxima DC em Watts' },
       maxVoltageDC: { type: 'string', description: 'Tensão máxima de entrada DC em Volts (número apenas)' },
@@ -309,11 +263,11 @@ async function extractDataWithLLM(text: string, type: 'module' | 'inverter'): Pr
 Rules:
 - Extract ONLY the requested fields. Omit fields not found.
 - For numeric fields, return ONLY the number — no units, no tolerances, no symbols.
-- If a datasheet has a table with multiple power variants (e.g. 700W, 705W ... 730W), always extract data for the HIGHEST power model.
-- Strip tolerances from dimensions: "2384(±2)" → "2384".
-- For weight with multiple values (e.g. "32.5 / 33.5 / 34.5"), use the first value.
-- For microinverters: nominalPowerAC = AC output power (not DC input power).
-- Use STC (Standard Test Conditions) values for module electrical parameters.`,
+- If a datasheet has multiple power variants (e.g. 700W...730W), always use the HIGHEST power model.
+- Strip tolerances: "2384(±2)" → "2384".
+- For weight with multiple values (e.g. "32.5 / 33.5"), use the first.
+- For microinverters: nominalPowerAC = AC output power (not DC input).
+- Use STC values for module electrical parameters.`,
       },
       {
         role: 'user',
@@ -322,11 +276,7 @@ Rules:
     ],
     response_format: {
       type: 'json_schema',
-      json_schema: {
-        name: `${type}_specs`,
-        strict: true,
-        schema,
-      },
+      json_schema: { name: `${type}_specs`, strict: true, schema },
     },
   });
 
@@ -336,22 +286,17 @@ Rules:
   const contentStr = typeof content === 'string' ? content : JSON.stringify(content);
   let parsed = JSON.parse(contentStr);
 
-  if (type === 'module') {
-    parsed = postProcessModuleData(parsed);
-  }
+  if (type === 'module') parsed = postProcessModuleData(parsed);
 
   return parsed;
 }
 
-/**
- * Detecta automaticamente o tipo de datasheet e extrai os dados técnicos.
- */
 export async function parseDatasheet(pdfBuffer: Buffer): Promise<{ type: 'module' | 'inverter'; data: any }> {
   try {
     const text = await extractPdfText(pdfBuffer);
 
     if (!text || text.trim().length === 0) {
-      throw new Error('Não foi possível extrair texto do PDF. O arquivo pode estar vazio ou protegido.');
+      throw new Error('Não foi possível extrair texto do PDF.');
     }
 
     const type = detectDatasheetType(text);
