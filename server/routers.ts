@@ -4,6 +4,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { validateModuleInverterCompatibility, calculateOptimalStringSize } from "./validators/compatibility";
 import { parseDatasheet } from "./parsers/datasheetParser";
+import { parseEnergyBill } from "./parsers/energyBillParser";
 import { z } from "zod";
 import * as db from "./db";
 import { promises as fs } from 'fs';
@@ -104,6 +105,15 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         await db.deleteClient(input.id);
         return { success: true };
+      }),
+
+    // ── Importar dados do cliente a partir da conta de energia ──
+    parseEnergyBill: protectedProcedure
+      .input(z.object({ fileBase64: z.string() }))
+      .mutation(async ({ input }) => {
+        const buffer = Buffer.from(input.fileBase64, 'base64');
+        const data = await parseEnergyBill(buffer);
+        return data;
       }),
   }),
 
@@ -588,7 +598,6 @@ export const appRouter = router({
         }));
 
         const generatorData = {
-          // Cliente
           nome_cliente:   client.name,
           cpf_cnpj:       client.cpfCnpj,
           rg:             client.rg || '',
@@ -598,8 +607,6 @@ export const appRouter = router({
           uf:             client.state,
           email:          client.email || '',
           celular:        client.phone || client.landline || '',
-
-          // Unidade consumidora
           conta_contrato:      project.accountContract || '',
           carga_declarada:     project.declaredLoad || '',
           disjuntor_entrada:   project.entryBreakerCurrent?.toString() || '',
@@ -610,11 +617,7 @@ export const appRouter = router({
           tensao_atendimento:  project.serviceVoltage?.toString() || '',
           tipo_ligacao:        project.connectionType || '',
           enquadramento:       project.classification || '',
-
-          // Totais
           potencia_total_kw: (project.totalInstalledPower / 1000).toFixed(2),
-
-          // Responsável técnico
           resp_tecnico_nome:     technicalResponsible.name,
           resp_tecnico_titulo:   technicalResponsible.title,
           resp_tecnico_registro: technicalResponsible.registrationNumber || '',
@@ -625,8 +628,6 @@ export const appRouter = router({
           resp_tecnico_cidade:   technicalResponsible.city || '',
           resp_tecnico_uf:       technicalResponsible.state || '',
           resp_tecnico_cep:      technicalResponsible.cep || '',
-
-          // Módulos
           modules: modulesData.map(item => ({
             potencia:   item.module?.nominalPower || 0,
             qtd:        item.quantity,
@@ -634,8 +635,6 @@ export const appRouter = router({
             fabricante: item.module?.manufacturer || '',
             modelo:     item.module?.model || '',
           })),
-
-          // Inversores
           inverters: invertersData.map(item => ({
             fabricante:            item.inverter?.manufacturer || '',
             modelo:                item.inverter?.model || '',
@@ -688,7 +687,6 @@ export const appRouter = router({
         }));
 
         const generatorData = {
-          // Cliente
           nome_cliente:   client.name,
           cpf_cnpj:       client.cpfCnpj,
           rg:             client.rg || 'PENDENTE',
@@ -698,8 +696,6 @@ export const appRouter = router({
           uf:             client.state,
           email:          client.email || '',
           celular:        client.phone || client.landline || '',
-
-          // Unidade consumidora
           conta_contrato:         project.accountContract || '',
           carga_declarada:        project.declaredLoad?.toString().replace('.', ',') || '0,00',
           disjuntor_entrada:      project.entryBreakerCurrent?.toString() || '',
@@ -715,11 +711,7 @@ export const appRouter = router({
           potencia_disponibilizada: project.availablePower?.toString().replace('.', ',') || '0,00',
           enquadramento:          project.classification || 'AUTOCONSUMO LOCAL',
           classe_uc:              client.consumptionClass || 'Residencial',
-
-          // Totais
           potencia_total_kw: (project.totalInstalledPower / 1000).toFixed(2).replace('.', ','),
-
-          // Responsável técnico
           resp_tecnico_nome:     technicalResponsible.name,
           resp_tecnico_titulo:   technicalResponsible.title,
           resp_tecnico_registro: technicalResponsible.registrationNumber,
@@ -730,12 +722,9 @@ export const appRouter = router({
           resp_tecnico_cidade:   technicalResponsible.city || '',
           resp_tecnico_uf:       technicalResponsible.state || '',
           resp_tecnico_cep:      technicalResponsible.cep || '',
-
           data_extenso: new Date().toLocaleDateString('pt-BR', {
             month: 'long', year: 'numeric',
           }).toUpperCase(),
-
-          // Módulos
           modules: modulesData.map(item => ({
             potencia:    item.module?.nominalPower || 0,
             qtd:         item.quantity,
@@ -752,8 +741,6 @@ export const appRouter = router({
             largura:     item.module?.width || '',
             peso:        item.module?.weight || '',
           })),
-
-          // Inversores
           inverters: invertersData.map(item => ({
             fabricante:            item.inverter?.manufacturer || '',
             modelo:                item.inverter?.model || '',
