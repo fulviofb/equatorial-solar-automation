@@ -17,6 +17,10 @@ import { Plus, Pencil, Trash2, Search, Cpu, Upload } from "lucide-react";
 import { useState, useRef } from "react";
 import { toast } from "sonner";
 
+// Limite máximo do PDF considerando o teto de 4.5MB da Vercel para funções serverless.
+// Base64 aumenta o tamanho em ~33%, então 3MB × 1.33 ≈ 4MB (margem segura).
+const MAX_PDF_SIZE = 3 * 1024 * 1024; // 3MB
+
 export default function Inverters() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
@@ -27,7 +31,6 @@ export default function Inverters() {
   const parseMutation = trpc.datasheet.parse.useMutation({
     onSuccess: (result) => {
       if (result.type === 'inverter') {
-        // Preencher formulário com dados extraídos
         setEditing(result.data);
         setOpen(true);
         toast.success("Dados importados do datasheet com sucesso!");
@@ -46,15 +49,19 @@ export default function Inverters() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Resetar input para permitir selecionar o mesmo arquivo novamente
+    e.target.value = "";
+
     if (file.type !== 'application/pdf') {
       toast.error("Por favor, selecione um arquivo PDF");
       return;
     }
 
-    // Limitar tamanho do arquivo a 5MB
-    const maxSize = 5 * 1024 * 1024; // 5MB em bytes
-    if (file.size > maxSize) {
-      toast.error("O arquivo é muito grande. Por favor, use um PDF com menos de 5MB.");
+    if (file.size > MAX_PDF_SIZE) {
+      toast.error(
+        `PDF muito grande (${(file.size / 1024 / 1024).toFixed(1)}MB). ` +
+        `O limite é 3MB. Reduza o PDF usando uma ferramenta como ilovepdf.com ou smallpdf.com e tente novamente.`
+      );
       return;
     }
 
@@ -170,6 +177,7 @@ export default function Inverters() {
               variant="outline"
               onClick={() => fileInputRef.current?.click()}
               disabled={isImporting}
+              title="Importar datasheet PDF (máx. 3MB). PDFs maiores podem ser reduzidos em ilovepdf.com"
             >
               <Upload className="mr-2 h-4 w-4" />
               {isImporting ? "Importando..." : "Importar Datasheet"}
@@ -264,6 +272,7 @@ export default function Inverters() {
                           id="maxCurrentPerInput"
                           name="maxCurrentPerInput"
                           placeholder="18"
+                          defaultValue={editing?.maxCurrentPerInput}
                         />
                       </div>
                     </div>
@@ -298,7 +307,7 @@ export default function Inverters() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                       <div className="grid gap-2">
                         <Label htmlFor="numberOfMppt">Quantidade de MPPT</Label>
                         <Input
@@ -319,20 +328,8 @@ export default function Inverters() {
                           defaultValue={editing?.numberOfStrings}
                         />
                       </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="grid gap-2">
-                        <Label htmlFor="maxCurrentPerInput">Corrente Máxima por Entrada [A]</Label>
-                        <Input
-                          id="maxCurrentPerInput"
-                          name="maxCurrentPerInput"
-                          placeholder="18"
-                          defaultValue={editing?.maxCurrentPerInput}
-                        />
-                      </div>
-                      <div className="grid gap-2 col-span-2">
-                        <Label htmlFor="isMicroinverter" className="flex items-center gap-2 cursor-pointer">
+                      <div className="grid gap-2 flex items-end">
+                        <Label htmlFor="isMicroinverter" className="flex items-center gap-2 cursor-pointer mt-6">
                           <input
                             type="checkbox"
                             id="isMicroinverter"
@@ -340,12 +337,8 @@ export default function Inverters() {
                             className="h-4 w-4"
                             defaultChecked={editing?.isMicroinverter === 1}
                           />
-                          <span>É microinversor? (cada saída opera com 1 módulo independente)</span>
+                          <span>É microinversor?</span>
                         </Label>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Marque esta opção se este inversor opera com módulos individualizados (microinversor),
-                          onde cada entrada gerencia um módulo separadamente, sem conexão em série.
-                        </p>
                       </div>
                     </div>
 
