@@ -107,32 +107,26 @@ async function extractPdfText(pdfBuffer: Buffer): Promise<string> {
 }
 
 /**
- * Detecta o tipo de datasheet (módulo ou inversor) com base no texto extraído.
- *
- * Cobre textos em português e inglês, incluindo microinversores brasileiros
- * (ex: Tsuness, Hoymiles, APsystems) cujos datasheets usam "Microinversor",
- * "Saída [CA]", "Entrada [CC]", "Ficha Técnica" etc.
+ * Detecta o tipo de datasheet (módulo ou inversor) com base em sistema de pontuação.
+ * Cobre português e inglês, incluindo microinversores (Tsuness, Hoymiles, APsystems etc.).
  */
 function detectDatasheetType(text: string): 'module' | 'inverter' | null {
-  // --- Sinais de INVERSOR (ordem de especificidade: mais específico primeiro) ---
   const inverterSignals = [
-    // Português — microinversores e string
     /microinversor/i,
     /micro\s*inversor/i,
-    /sa[ií]da\s*\[?ca\]?/i,          // "Saída [CA]" ou "Saída CA"
-    /entrada\s*\[?cc\]?/i,            // "Entrada [CC]"
+    /sa[ií]da\s*\[?ca\]?/i,
+    /entrada\s*\[?cc\]?/i,
     /pot[eê]ncia\s*(m[aá]xima\s*)?nominal\s*de\s*sa[ií]da/i,
     /corrente\s*m[aá]xima\s*de\s*sa[ií]da/i,
     /tens[aã]o\s*nominal\s*de\s*sa[ií]da/i,
     /tens[aã]o\s*m[aá]xima\s*de\s*entrada/i,
     /faixa\s*de\s*tens[aã]o\s*mppt/i,
     /tens[aã]o\s*de\s*partida/i,
-    /distors[aã]o\s*harm[oô]nica/i,   // "Distorção Harmônica de Corrente"
+    /distors[aã]o\s*harm[oô]nica/i,
     /efici[eê]ncia\s*eu/i,
     /efici[eê]ncia\s*(m[aá]xima\s*)?do\s*inversor/i,
     /quantidade\s*de\s*mppts?/i,
     /quantidade\s*de\s*entradas\s*cc/i,
-    // Inglês
     /inverter/i,
     /inversor/i,
     /grid.?tied/i,
@@ -141,27 +135,30 @@ function detectDatasheetType(text: string): 'module' | 'inverter' | null {
     /mppt/i,
   ];
 
-  // --- Sinais de MÓDULO FOTOVOLTAICO ---
   const moduleSignals = [
-    // Português
     /m[oó]dulo\s*fotovoltaico/i,
+    /solar\s*module/i,
     /painel\s*solar/i,
     /pot[eê]ncia\s*de\s*pico/i,
-    /tens[aã]o\s*de\s*circuito\s*aberto/i,  // Voc
-    /corrente\s*de\s*curto.?circuito/i,      // Isc
-    /tens[aã]o\s*(de|no)\s*(m[aá]xima|ponto)/i, // Vmpp
+    /tens[aã]o\s*de\s*circuito\s*aberto/i,
+    /corrente\s*de\s*curto.?circuito/i,
+    /tens[aã]o\s*(de|no)\s*(m[aá]xima|ponto)/i,
     /efici[eê]ncia\s*(do\s*m[oó]dulo|solar)/i,
     /c[eé]lulas?\s*fotovoltaicas?/i,
-    /voc\s*[(\[]/i,                          // "Voc [V]"
-    /isc\s*[(\[]/i,                          // "Isc [A]"
-    /vmpp\s*[(\[]/i,
-    /impp\s*[(\[]/i,
-    // Inglês
+    /voc\s*[([\[]/i,
+    /isc\s*[([\[]/i,
+    /vmpp\s*[([\[]/i,
+    /impp\s*[([\[]/i,
     /solar\s*panel/i,
     /photovoltaic\s*module/i,
     /solar\s*cell/i,
     /open.?circuit\s*voltage/i,
     /short.?circuit\s*current/i,
+    /maximum\s*power\s*(output|voltage|current)/i,
+    /bifacial/i,
+    /half.?cell/i,
+    /module\s*(efficiency|weight|dimensions)/i,
+    /hjt|perc|topcon/i,
   ];
 
   const inverterScore = inverterSignals.filter(r => r.test(text)).length;
@@ -169,15 +166,54 @@ function detectDatasheetType(text: string): 'module' | 'inverter' | null {
 
   console.log(`[Datasheet Parser] Scores — inversor: ${inverterScore}, módulo: ${moduleScore}`);
 
-  // Empate ou ambos zero: não identificado
   if (inverterScore === 0 && moduleScore === 0) return null;
   if (inverterScore > moduleScore) return 'inverter';
   if (moduleScore > inverterScore) return 'module';
 
-  // Empate: presença de "Microinversor" ou "Saída [CA]" desempata para inversor
+  // Empate: microinversor tem precedência
   if (/microinversor|sa[ií]da\s*\[?ca\]?/i.test(text)) return 'inverter';
 
   return null;
+}
+
+/**
+ * Pós-processa os dados extraídos do módulo:
+ * - Remove tolerâncias de dimensões: "2384(±2)" → "2384"
+ * - Calcula área se não informada: comprimento × largura (convertido de mm para m²)
+ * - Remove unidades residuais dos campos numéricos
+ */
+function postProcessModuleData(data: any): any {
+  const clean = (val: string | undefined): string | undefined => {
+    if (!val) return val;
+    // Remove tolerâncias tipo "(±2)", "(+5/-0)", "±2"
+    let v = String(val).replace(/\s*\(±[\d.]+\)/g, '').replace(/±[\d.]+/g, '').trim();
+    // Remove unidades residuais comuns
+    v = v.replace(/\s*(mm|m²|kg|w|v|a|%)\s*$/i, '').trim();
+    // Se ficou com múltiplos valores separados por "/" ou "~", pegar o primeiro
+    if (v.includes('/')) v = v.split('/')[0].trim();
+    return v;
+  };
+
+  const result = { ...data };
+
+  // Limpar campos numéricos
+  for (const key of ['voc', 'isc', 'vmpp', 'impp', 'efficiency', 'length', 'width', 'weight']) {
+    if (result[key]) result[key] = clean(result[key]);
+  }
+
+  // Calcular área se não vier do datasheet (módulos raramente listam área diretamente)
+  if (!result.area && result.length && result.width) {
+    const l = parseFloat(result.length);
+    const w = parseFloat(result.width);
+    if (!isNaN(l) && !isNaN(w) && l > 0 && w > 0) {
+      // Dimensões em mm → m²
+      const area = (l / 1000) * (w / 1000);
+      result.area = area.toFixed(3);
+      console.log(`[Datasheet Parser] Área calculada: ${l}mm × ${w}mm = ${result.area} m²`);
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -187,17 +223,50 @@ async function extractDataWithLLM(text: string, type: 'module' | 'inverter'): Pr
   const schema = type === 'module' ? {
     type: 'object',
     properties: {
-      manufacturer: { type: 'string', description: 'Fabricante do módulo' },
-      model: { type: 'string', description: 'Modelo do módulo (código exato)' },
-      nominalPower: { type: 'integer', description: 'Potência nominal em Watts (apenas o número)' },
-      voc: { type: 'string', description: 'Tensão de circuito aberto Voc em Volts (apenas o número)' },
-      isc: { type: 'string', description: 'Corrente de curto-circuito Isc em Amperes (apenas o número)' },
-      vmpp: { type: 'string', description: 'Tensão no ponto de máxima potência Vmpp em Volts (apenas o número)' },
-      impp: { type: 'string', description: 'Corrente no ponto de máxima potência Impp em Amperes (apenas o número)' },
-      efficiency: { type: 'string', description: 'Eficiência em porcentagem (apenas o número, sem %)' },
-      length: { type: 'string', description: 'Comprimento em mm (apenas o número)' },
-      width: { type: 'string', description: 'Largura em mm (apenas o número)' },
-      weight: { type: 'string', description: 'Peso em kg (apenas o número)' },
+      manufacturer: {
+        type: 'string',
+        description: 'Company name / fabricante. Ex: "ERA Solar", "Canadian Solar", "Jinko Solar"',
+      },
+      model: {
+        type: 'string',
+        description: 'Exact model code / código do modelo. Ex: "ERA-HJT-66HD-730M", "CS3W-450P". If the datasheet lists multiple power variants (700W, 705W ... 730W), pick the highest power model.',
+      },
+      nominalPower: {
+        type: 'integer',
+        description: 'Maximum power / Potência máxima em Watts (STC). Integer only, no units. If the datasheet lists multiple models, use the highest Wp value (e.g. 730, not 700).',
+      },
+      voc: {
+        type: 'string',
+        description: 'Open circuit voltage / Tensão Voc in Volts. Number only (e.g. "49.55"). Use STC values. If multiple models listed, use the value for the highest Wp model.',
+      },
+      isc: {
+        type: 'string',
+        description: 'Short circuit current / Corrente Isc in Amperes. Number only (e.g. "18.65"). Use STC values. If multiple models listed, use the value for the highest Wp model.',
+      },
+      vmpp: {
+        type: 'string',
+        description: 'Maximum power voltage / Tensão Vmpp in Volts. Number only (e.g. "41.36"). Use STC values. If multiple models listed, use the value for the highest Wp model.',
+      },
+      impp: {
+        type: 'string',
+        description: 'Maximum power current / Corrente Impp in Amperes. Number only (e.g. "17.65"). Use STC values. If multiple models listed, use the value for the highest Wp model.',
+      },
+      efficiency: {
+        type: 'string',
+        description: 'Module efficiency / Eficiência do módulo in %. Number only without % sign (e.g. "23.52"). If multiple models, use the highest Wp value.',
+      },
+      length: {
+        type: 'string',
+        description: 'Module length / Comprimento in mm. Number only, no tolerances (e.g. "2384" not "2384(±2)"). Usually the larger dimension.',
+      },
+      width: {
+        type: 'string',
+        description: 'Module width / Largura in mm. Number only, no tolerances (e.g. "1303" not "1303(±2)"). Usually the smaller dimension.',
+      },
+      weight: {
+        type: 'string',
+        description: 'Module weight / Peso in kg. Number only (e.g. "32.5"). If multiple values listed (e.g. "32.5 / 33.5 / 34.5"), use the first/lightest value.',
+      },
     },
     required: [],
     additionalProperties: false,
@@ -205,23 +274,23 @@ async function extractDataWithLLM(text: string, type: 'module' | 'inverter'): Pr
     type: 'object',
     properties: {
       manufacturer: { type: 'string', description: 'Fabricante do inversor' },
-      model: { type: 'string', description: 'Modelo exato do inversor (ex: TSOL-MX3000D)' },
-      nominalPowerAC: { type: 'integer', description: 'Potência nominal AC em Watts — campo "Potência Máxima Nominal de Saída" ou equivalente (apenas o número)' },
-      nominalPowerDC: { type: 'integer', description: 'Potência nominal DC em Watts — potência de entrada (apenas o número)' },
+      model: { type: 'string', description: 'Modelo exato do inversor (ex: TSOL-MX3000D). Se houver múltiplos modelos, usar o do título ou o mais proeminente.' },
+      nominalPowerAC: { type: 'integer', description: 'Potência nominal AC em Watts — "Potência Máxima Nominal de Saída" / "Maximum Output Power" (apenas o número). Para microinversores, é a potência de SAÍDA CA, não a de entrada CC.' },
+      nominalPowerDC: { type: 'integer', description: 'Potência nominal DC de entrada em Watts (apenas o número)' },
       maxPowerDC: { type: 'integer', description: 'Potência máxima DC em Watts (apenas o número)' },
-      maxVoltageDC: { type: 'string', description: 'Tensão máxima de entrada DC em Volts — campo "Tensão Máxima de Entrada" (apenas o número)' },
-      maxCurrentDC: { type: 'string', description: 'Corrente de curto-circuito em Amperes — campo "Corrente de Curto-circuito" (apenas o número)' },
-      mpptVoltageMax: { type: 'string', description: 'Tensão máxima da faixa MPPT em Volts — campo "Faixa de Tensão MPPT" (parte superior, apenas o número)' },
-      mpptVoltageMin: { type: 'string', description: 'Tensão mínima da faixa MPPT em Volts — campo "Faixa de Tensão MPPT" (parte inferior, apenas o número)' },
-      startupVoltageDC: { type: 'string', description: 'Tensão de partida em Volts — campo "Tensão de Partida por Entrada" (apenas o número)' },
-      numberOfMppt: { type: 'integer', description: 'Quantidade de MPPTs — campo "Quantidade de MPPTs"' },
-      numberOfStrings: { type: 'integer', description: 'Quantidade de entradas CC — campo "Quantidade de Entradas CC"' },
-      nominalVoltageAC: { type: 'string', description: 'Tensão nominal de saída AC em Volts — campo "Tensão Nominal de Saída" (ex: 220)' },
+      maxVoltageDC: { type: 'string', description: 'Tensão máxima de entrada DC em Volts (apenas o número)' },
+      maxCurrentDC: { type: 'string', description: 'Corrente de curto-circuito / máxima de entrada em Amperes (apenas o número)' },
+      mpptVoltageMax: { type: 'string', description: 'Tensão máxima da faixa MPPT em Volts (parte superior do range, ex: "60" de "16~60")' },
+      mpptVoltageMin: { type: 'string', description: 'Tensão mínima da faixa MPPT em Volts (parte inferior do range, ex: "16" de "16~60")' },
+      startupVoltageDC: { type: 'string', description: 'Tensão de partida em Volts (apenas o número)' },
+      numberOfMppt: { type: 'integer', description: 'Quantidade de MPPTs' },
+      numberOfStrings: { type: 'integer', description: 'Quantidade de entradas CC / strings' },
+      nominalVoltageAC: { type: 'string', description: 'Tensão nominal de saída AC em Volts (ex: "220")' },
       nominalFrequency: { type: 'string', description: 'Frequência nominal em Hz (apenas o número)' },
-      maxCurrentAC: { type: 'string', description: 'Corrente máxima de saída CA em Amperes — campo "Corrente Máxima de Saída" (apenas o número)' },
-      powerFactor: { type: 'string', description: 'Fator de potência (ex: >0.99)' },
-      thdCurrent: { type: 'string', description: 'THD de corrente (ex: <3%)' },
-      maxEfficiency: { type: 'string', description: 'Eficiência máxima do inversor em % (apenas o número, sem %)' },
+      maxCurrentAC: { type: 'string', description: 'Corrente máxima de saída CA em Amperes (apenas o número)' },
+      powerFactor: { type: 'string', description: 'Fator de potência (ex: ">0.99")' },
+      thdCurrent: { type: 'string', description: 'THD de corrente (ex: "<3%")' },
+      maxEfficiency: { type: 'string', description: 'Eficiência máxima em % (apenas o número, sem %)' },
       euEfficiency: { type: 'string', description: 'Eficiência EU em % (apenas o número, sem %)' },
       mpptEfficiency: { type: 'string', description: 'Eficiência MPPT em % (apenas o número, sem %)' },
     },
@@ -229,18 +298,20 @@ async function extractDataWithLLM(text: string, type: 'module' | 'inverter'): Pr
     additionalProperties: false,
   };
 
-  const typeLabel = type === 'module' ? 'solar module' : 'solar inverter / microinverter';
-  const extraContext = type === 'inverter'
-    ? '\nIMPORTANT: If the datasheet shows a table with multiple models, extract data for the model mentioned in the title or the most prominent model. For microinverters, "nominalPowerAC" is the AC output power (Saída CA), NOT the DC input power.'
-    : '';
+  const typeLabel = type === 'module' ? 'solar photovoltaic module' : 'solar inverter / microinverter';
 
   const response = await invokeLLM({
     messages: [
       {
         role: 'system',
-        content: `You are a technical data extraction assistant specializing in solar equipment datasheets (Portuguese and English).
-Extract specifications accurately. Return ONLY the requested fields.
-If a field is not found, omit it. For numeric fields, return ONLY the number without units.${extraContext}`,
+        content: `You are a precise technical data extraction assistant for solar equipment datasheets (Portuguese and English).
+Rules:
+- Extract ONLY the requested fields. Omit fields not found.
+- For numeric fields, return ONLY the number — no units, no tolerances, no symbols.
+- If a datasheet has a table with multiple power variants (e.g. 700W, 705W ... 730W), always extract data for the HIGHEST power model in the range.
+- Strip tolerances from dimensions: "2384(±2)" → "2384".
+- For weight with multiple values (e.g. "32.5 / 33.5 / 34.5"), use the first value.
+- For microinverters: nominalPowerAC = AC output power (not DC input).`,
       },
       {
         role: 'user',
@@ -261,7 +332,14 @@ If a field is not found, omit it. For numeric fields, return ONLY the number wit
   if (!content) throw new Error('No response from LLM');
 
   const contentStr = typeof content === 'string' ? content : JSON.stringify(content);
-  return JSON.parse(contentStr);
+  let parsed = JSON.parse(contentStr);
+
+  // Pós-processamento específico para módulos
+  if (type === 'module') {
+    parsed = postProcessModuleData(parsed);
+  }
+
+  return parsed;
 }
 
 /**
@@ -278,7 +356,7 @@ export async function parseDatasheet(pdfBuffer: Buffer): Promise<{ type: 'module
     const type = detectDatasheetType(text);
 
     if (!type) {
-      console.error('[Datasheet Parser] Nenhuma palavra-chave reconhecida. Trecho do texto:', text.substring(0, 500));
+      console.error('[Datasheet Parser] Nenhuma palavra-chave reconhecida. Trecho:', text.substring(0, 500));
       throw new Error(
         'Não foi possível identificar se este é um datasheet de módulo ou inversor. ' +
         'Verifique se o PDF contém a ficha técnica do equipamento.'
