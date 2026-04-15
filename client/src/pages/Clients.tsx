@@ -20,22 +20,80 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
-import { Plus, Pencil, Trash2, Search } from "lucide-react";
-import { useState } from "react";
+import { Plus, Pencil, Trash2, Search, FileText, Zap } from "lucide-react";
+import { useState, useRef } from "react";
 import { toast } from "sonner";
+
+// Limite seguro: 3MB × 1.33 base64 ≈ 4MB (teto Vercel = 4.5MB)
+const MAX_PDF_SIZE = 3 * 1024 * 1024;
+
+const CONSUMPTION_CLASSES = [
+  "Residencial",
+  "Industrial",
+  "Comércio, serviços e outras atividades",
+  "Rural",
+  "Poder Público",
+  "Iluminação Pública",
+  "Serviço Público",
+] as const;
+
+type ConsumptionClass = typeof CONSUMPTION_CLASSES[number];
+
+// Dados importados da conta — usados para pré-preencher o formulário
+interface ImportedBillData {
+  name?: string;
+  cpfCnpj?: string;
+  address?: string;
+  neighborhood?: string;
+  cep?: string;
+  city?: string;
+  state?: string;
+  accountContract?: string;
+  connectionType?: string;
+  serviceVoltage?: string;
+  consumptionClass?: string;
+}
 
 export default function Clients() {
   const [open, setOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isImporting, setIsImporting] = useState(false);
+  // Dados pré-preenchidos pela importação da conta
+  const [importedData, setImportedData] = useState<ImportedBillData | null>(null);
+  // Controla select de classe de consumo
+  const [selectedClass, setSelectedClass] = useState<ConsumptionClass>("Residencial");
+
+  const billInputRef = useRef<HTMLInputElement>(null);
 
   const { data: clients, isLoading } = trpc.clients.list.useQuery();
   const utils = trpc.useUtils();
+
+  const parseEnergyBillMutation = trpc.clients.parseEnergyBill.useMutation({
+    onSuccess: (data) => {
+      setImportedData(data);
+      // Definir classe de consumo extraída
+      if (data.consumptionClass && CONSUMPTION_CLASSES.includes(data.consumptionClass as ConsumptionClass)) {
+        setSelectedClass(data.consumptionClass as ConsumptionClass);
+      } else {
+        setSelectedClass("Residencial");
+      }
+      setEditingClient(null);
+      setOpen(true);
+      setIsImporting(false);
+      toast.success("Dados importados da conta de energia! Revise e salve.");
+    },
+    onError: (error) => {
+      toast.error("Erro ao importar conta: " + error.message);
+      setIsImporting(false);
+    },
+  });
 
   const createMutation = trpc.clients.create.useMutation({
     onSuccess: () => {
       utils.clients.list.invalidate();
       setOpen(false);
+      setImportedData(null);
       toast.success("Cliente cadastrado com sucesso!");
     },
     onError: (error) => {
@@ -48,6 +106,7 @@ export default function Clients() {
       utils.clients.list.invalidate();
       setOpen(false);
       setEditingClient(null);
+      setImportedData(null);
       toast.success("Cliente atualizado com sucesso!");
     },
     onError: (error) => {
@@ -65,23 +124,48 @@ export default function Clients() {
     },
   });
 
+  const handleBillUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+
+    if (file.type !== "application/pdf") {
+      toast.error("Selecione um arquivo PDF");
+      return;
+    }
+    if (file.size > MAX_PDF_SIZE) {
+      toast.error(
+        `PDF muito grande (${(file.size / 1024 / 1024).toFixed(1)}MB). Limite: 3MB. Reduza em ilovepdf.com e tente novamente.`
+      );
+      return;
+    }
+
+    setIsImporting(true);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      parseEnergyBillMutation.mutate({ fileBase64: base64.split(",")[1] });
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    
+
     const data = {
       name: formData.get("name") as string,
       cpfCnpj: formData.get("cpfCnpj") as string,
-      rg: formData.get("rg") as string || undefined,
+      rg: (formData.get("rg") as string) || undefined,
       address: formData.get("address") as string,
-      cep: formData.get("cep") as string || undefined,
+      cep: (formData.get("cep") as string) || undefined,
       city: formData.get("city") as string,
       state: formData.get("state") as string,
-      phone: formData.get("phone") as string || undefined,
-      landline: formData.get("landline") as string || undefined,
-      email: formData.get("email") as string || undefined,
-      activityType: formData.get("activityType") as string || undefined,
-      consumptionClass: formData.get("consumptionClass") as any,
+      phone: (formData.get("phone") as string) || undefined,
+      landline: (formData.get("landline") as string) || undefined,
+      email: (formData.get("email") as string) || undefined,
+      activityType: (formData.get("activityType") as string) || undefined,
+      consumptionClass: selectedClass,
     };
 
     if (editingClient) {
@@ -91,15 +175,38 @@ export default function Clients() {
     }
   };
 
-  const filteredClients = clients?.filter((client) =>
-    client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.cpfCnpj.includes(searchTerm) ||
-    client.city?.toLowerCase().includes(searchTerm.toLowerCase())
+  const handleOpenNew = () => {
+    setEditingClient(null);
+    setImportedData(null);
+    setSelectedClass("Residencial");
+    setOpen(true);
+  };
+
+  const handleOpenEdit = (client: any) => {
+    setEditingClient(client);
+    setImportedData(null);
+    setSelectedClass(client.consumptionClass || "Residencial");
+    setOpen(true);
+  };
+
+  const filteredClients = clients?.filter(
+    (client) =>
+      client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      client.cpfCnpj.includes(searchTerm) ||
+      client.city?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Valor padrão: importado > editando > vazio
+  const defaultVal = (importedKey: keyof ImportedBillData, editKey?: string) => {
+    if (importedData) return importedData[importedKey] ?? "";
+    if (editingClient) return editingClient[editKey ?? importedKey] ?? "";
+    return "";
+  };
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Clientes</h1>
@@ -107,176 +214,237 @@ export default function Clients() {
               Gerencie os clientes titulares das unidades consumidoras
             </p>
           </div>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={() => setEditingClient(null)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Novo Cliente
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>
-                  {editingClient ? "Editar Cliente" : "Novo Cliente"}
-                </DialogTitle>
-                <DialogDescription>
-                  Preencha os dados do cliente titular da unidade consumidora
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleSubmit}>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="name">Nome Completo / Razão Social *</Label>
-                    <Input
-                      id="name"
-                      name="name"
-                      defaultValue={editingClient?.name}
-                      required
-                    />
+          <div className="flex gap-2">
+            {/* Input oculto para conta de energia */}
+            <input
+              ref={billInputRef}
+              type="file"
+              accept=".pdf"
+              onChange={handleBillUpload}
+              className="hidden"
+            />
+            <Button
+              variant="outline"
+              onClick={() => billInputRef.current?.click()}
+              disabled={isImporting}
+              title="Importar conta de energia PDF (máx. 3MB) para pré-preencher o cadastro"
+            >
+              <Zap className="mr-2 h-4 w-4" />
+              {isImporting ? "Importando..." : "Importar Conta de Energia"}
+            </Button>
+
+            <Dialog open={open} onOpenChange={(v) => {
+              setOpen(v);
+              if (!v) { setImportedData(null); setEditingClient(null); }
+            }}>
+              <DialogTrigger asChild>
+                <Button onClick={handleOpenNew}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Novo Cliente
+                </Button>
+              </DialogTrigger>
+
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>
+                    {importedData
+                      ? "Revisar Dados da Conta de Energia"
+                      : editingClient
+                      ? "Editar Cliente"
+                      : "Novo Cliente"}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {importedData
+                      ? "Verifique os dados extraídos da conta e complete as informações faltantes antes de salvar."
+                      : "Preencha os dados do cliente titular da unidade consumidora"}
+                  </DialogDescription>
+                </DialogHeader>
+
+                {importedData && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-800 flex items-start gap-2">
+                    <FileText className="h-4 w-4 mt-0.5 shrink-0" />
+                    <span>
+                      Dados importados da conta de energia. UC: <strong>{importedData.accountContract}</strong>
+                      {importedData.serviceVoltage && <> · Tensão: <strong>{importedData.serviceVoltage}V</strong></>}
+                      {importedData.connectionType && <> · <strong>{importedData.connectionType}</strong></>}
+                    </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                )}
+
+                <form onSubmit={handleSubmit}>
+                  <div className="grid gap-4 py-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="cpfCnpj">CPF/CNPJ *</Label>
+                      <Label htmlFor="name">Nome Completo / Razão Social *</Label>
                       <Input
-                        id="cpfCnpj"
-                        name="cpfCnpj"
-                        defaultValue={editingClient?.cpfCnpj}
+                        key={`name-${importedData?.name}-${editingClient?.id}`}
+                        id="name"
+                        name="name"
+                        defaultValue={defaultVal("name")}
                         required
                       />
                     </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="rg">RG</Label>
-                      <Input
-                        id="rg"
-                        name="rg"
-                        defaultValue={editingClient?.rg}
-                      />
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="cpfCnpj">CPF/CNPJ *</Label>
+                        <Input
+                          key={`cpf-${importedData?.cpfCnpj}-${editingClient?.id}`}
+                          id="cpfCnpj"
+                          name="cpfCnpj"
+                          defaultValue={defaultVal("cpfCnpj")}
+                          required
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="rg">RG</Label>
+                        <Input
+                          id="rg"
+                          name="rg"
+                          defaultValue={editingClient?.rg ?? ""}
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="address">Endereço Completo *</Label>
-                    <Input
-                      id="address"
-                      name="address"
-                      defaultValue={editingClient?.address}
-                      required
-                    />
-                  </div>
-                  <div className="grid grid-cols-3 gap-4">
+
                     <div className="grid gap-2">
-                      <Label htmlFor="cep">CEP</Label>
+                      <Label htmlFor="address">Endereço *</Label>
                       <Input
-                        id="cep"
-                        name="cep"
-                        defaultValue={editingClient?.cep}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="city">Município *</Label>
-                      <Input
-                        id="city"
-                        name="city"
-                        defaultValue={editingClient?.city}
+                        key={`addr-${importedData?.address}-${editingClient?.id}`}
+                        id="address"
+                        name="address"
+                        placeholder="Rua, número, complemento"
+                        defaultValue={defaultVal("address")}
                         required
                       />
                     </div>
+
+                    {/* Bairro vem da conta mas não é campo do cliente — mostrar apenas se importado */}
+                    {importedData?.neighborhood && (
+                      <div className="grid gap-2">
+                        <Label className="text-gray-500 text-xs">
+                          Bairro (da conta — inclua no endereço se necessário)
+                        </Label>
+                        <p className="text-sm text-gray-700 bg-gray-50 rounded px-3 py-2 border">
+                          {importedData.neighborhood}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="cep">CEP</Label>
+                        <Input
+                          key={`cep-${importedData?.cep}-${editingClient?.id}`}
+                          id="cep"
+                          name="cep"
+                          defaultValue={defaultVal("cep")}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="city">Município *</Label>
+                        <Input
+                          key={`city-${importedData?.city}-${editingClient?.id}`}
+                          id="city"
+                          name="city"
+                          defaultValue={defaultVal("city")}
+                          required
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="state">UF *</Label>
+                        <Input
+                          key={`state-${importedData?.state}-${editingClient?.id}`}
+                          id="state"
+                          name="state"
+                          maxLength={2}
+                          defaultValue={defaultVal("state")}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="phone">Telefone Celular</Label>
+                        <Input
+                          id="phone"
+                          name="phone"
+                          defaultValue={editingClient?.phone ?? ""}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="landline">Telefone Fixo</Label>
+                        <Input
+                          id="landline"
+                          name="landline"
+                          defaultValue={editingClient?.landline ?? ""}
+                        />
+                      </div>
+                    </div>
+
                     <div className="grid gap-2">
-                      <Label htmlFor="state">UF *</Label>
+                      <Label htmlFor="email">E-mail</Label>
                       <Input
-                        id="state"
-                        name="state"
-                        maxLength={2}
-                        defaultValue={editingClient?.state}
+                        id="email"
+                        name="email"
+                        type="email"
+                        defaultValue={editingClient?.email ?? ""}
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="activityType">Ramo de Atividade</Label>
+                      <Input
+                        id="activityType"
+                        name="activityType"
+                        defaultValue={editingClient?.activityType ?? ""}
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="consumptionClass">Classe de Consumo *</Label>
+                      <Select
+                        value={selectedClass}
+                        onValueChange={(v) => setSelectedClass(v as ConsumptionClass)}
                         required
-                      />
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a classe" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CONSUMPTION_CLASSES.map((c) => (
+                            <SelectItem key={c} value={c}>{c}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="phone">Telefone Celular</Label>
-                      <Input
-                        id="phone"
-                        name="phone"
-                        defaultValue={editingClient?.phone}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="landline">Telefone Fixo</Label>
-                      <Input
-                        id="landline"
-                        name="landline"
-                        defaultValue={editingClient?.landline}
-                      />
-                    </div>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="email">E-mail</Label>
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      defaultValue={editingClient?.email}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="activityType">Ramo de Atividade</Label>
-                    <Input
-                      id="activityType"
-                      name="activityType"
-                      defaultValue={editingClient?.activityType}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="consumptionClass">Classe de Consumo *</Label>
-                    <Select
-                      name="consumptionClass"
-                      defaultValue={editingClient?.consumptionClass}
-                      required
+
+                  <DialogFooter>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setOpen(false);
+                        setEditingClient(null);
+                        setImportedData(null);
+                      }}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione a classe" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Residencial">Residencial</SelectItem>
-                        <SelectItem value="Industrial">Industrial</SelectItem>
-                        <SelectItem value="Comércio, serviços e outras atividades">
-                          Comércio, serviços e outras atividades
-                        </SelectItem>
-                        <SelectItem value="Rural">Rural</SelectItem>
-                        <SelectItem value="Poder Público">Poder Público</SelectItem>
-                        <SelectItem value="Iluminação Pública">
-                          Iluminação Pública
-                        </SelectItem>
-                        <SelectItem value="Serviço Público">
-                          Serviço Público
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setOpen(false);
-                      setEditingClient(null);
-                    }}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={createMutation.isPending || updateMutation.isPending}
-                  >
-                    {editingClient ? "Atualizar" : "Cadastrar"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={createMutation.isPending || updateMutation.isPending}
+                    >
+                      {editingClient ? "Atualizar" : "Cadastrar"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
+        {/* Lista */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -329,10 +497,7 @@ export default function Clients() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => {
-                          setEditingClient(client);
-                          setOpen(true);
-                        }}
+                        onClick={() => handleOpenEdit(client)}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
