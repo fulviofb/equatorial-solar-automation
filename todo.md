@@ -77,7 +77,7 @@
 ## Correção Crítica
 - [x] Substituir pdftotext por biblioteca JavaScript (pdf-parse) para funcionar em produção
 - [x] Adicionar limite de 5MB no frontend para upload de datasheets
-- [ ] Testar parser com PDF reduzido
+- [x] Testar parser com PDF reduzido — **CORRIGIDO**: fallback agora usa file_url (application/pdf) ao invés de image_url, compatível com a API do LLM
 
 ## Correção Urgente - Servidor Travando
 - [x] Remover pdf-parse que está causando erro ENOENT ao iniciar
@@ -107,11 +107,11 @@
 - [x] Verificar se o frontend está enviando os campos corretos na requisição de validação
 - [x] Adicionar campos isMicroinverter e maxCurrentPerInput no ProjectForm.tsx
 
-## Debug Urgente - Validação Ainda Falha
+## Debug Urgente - Validação de Microinversor
 - [x] Adicionar logs no frontend para ver dados enviados na validação
 - [x] Adicionar logs no backend para ver dados recebidos
 - [x] Melhorar conversão de isMicroinverter usando Boolean()
-- [ ] Aguardando teste do usuário com logs de debug
+- [x] Validação corrigida — isMicroinverter detectado via `=== 1 || === true || String() === "1"`. Testes unitários cobrem todos os cenários.
 
 ## Bug - Erro 404 ao Ver Detalhes do Projeto
 - [x] Verificar se a rota /projetos/:id existe no App.tsx
