@@ -27,13 +27,8 @@ function getEstadoExtenso(uf: string): string {
   return estados[uf?.toUpperCase()] || uf;
 }
 
-/**
- * Formata data no padrão do template: "JULHO – 2025"
- * (mês em maiúsculas + travessão + ano)
- */
 function formatDataExtenso(): string {
   const raw = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-  // "julho de 2026" → "JULHO – 2026"
   return raw.toUpperCase().replace(' DE ', ' \u2013 ');
 }
 
@@ -49,7 +44,7 @@ function gerarDescricaoSistema(modules: any[], inverters: any[]): string {
 
 /**
  * Escreve valor na célula mestre de uma região mesclada (ou diretamente se não for mesclada).
- * Necessário porque ExcelJS retorna MergedCell para células não-mestres, que são read-only.
+ * O template Equatorial tem muitas células mescladas; escrever em célula não-mestre é no-op.
  */
 function setCellValue(ws: ExcelJS.Worksheet, cellRef: string, value: any) {
   const cell = ws.getCell(cellRef);
@@ -92,80 +87,78 @@ export const NativeGenerator = {
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.readFile(TEMPLATE_EXCEL);
 
-      // ── ABA 0: Unidades Geradoras ──────────────────────────────────────────
+      // ATENÇÃO: O template tem 5 abas: ROTEIRO(0), 0(1), 1(2), 2(3), FONTES(4)
+      // Portanto, devemos acessar pelo nome, não pelo índice!
+      const ws0 = workbook.getWorksheet('0');
+      const ws1 = workbook.getWorksheet('1');
+
+      if (!ws0) throw new Error('Aba "0" não encontrada no template Excel');
+      if (!ws1) throw new Error('Aba "1" não encontrada no template Excel');
+
+      // ── ABA "0": Unidades Geradoras ────────────────────────────────────────
       //
-      // Estrutura validada contra o template oficial (ver ANALISE_FINAL_3f55c4c.md):
-      //
-      //  Linha 6  = Cabeçalhos (não tocar)
       //  Linhas 7–16 = Módulos fotovoltaicos (até 10 itens)
-      //
-      //  Colunas dos módulos:
-      //    C  (3)  = Nº item
-      //    D  (4)  = Potência do módulo (W)   [merged D:G]
-      //    H  (8)  = Quantidade               [merged H:J]
-      //    K  (11) = Potência de pico (kWp)   [merged K:O]
-      //    P  (16) = Área do arranjo (m²)     [merged P:S]
-      //    T  (20) = Fabricante               [merged T:Z]
-      //    AA (27) = Modelo                   [merged AA:AE]
+      //    C  = Nº item
+      //    D  = Potência do módulo (W)    [merged D:G]
+      //    H  = Quantidade                [merged H:J]
+      //    K  = Potência de pico (kWp)    [merged K:O]
+      //    P  = Área do arranjo (m²)      [merged P:S]
+      //    T  = Fabricante                [merged T:Z]
+      //    AA = Modelo                    [merged AA:AE]
       //
       //  Linhas 22–51 = Inversores (até 30 itens)
-      //
-      //  Colunas dos inversores:
-      //    C  (3)  = Nº item
-      //    D  (4)  = Fabricante               [merged D:G]
-      //    H  (8)  = Modelo                   [merged H:K]
-      //    L  (12) = Potência nominal (kW)    [merged L:O]
-      //    P  (16) = Tensão nominal (V)       [merged P:S]
-      //    T  (20) = Corrente máx (A)         [merged T:V]
-      //    W  (23) = Fator de potência        [merged W:Y]
-      //    Z  (26) = Rendimento (%)           [merged Z:AB]
-      //    AC (29) = DHT (%)                  [merged AC:AE]
+      //    C  = Nº item
+      //    D  = Fabricante                [merged D:G]
+      //    H  = Modelo                    [merged H:K]
+      //    L  = Potência nominal (kW)     [merged L:O]
+      //    P  = Tensão nominal (V)        [merged P:S]
+      //    T  = Corrente máx (A)          [merged T:V]
+      //    W  = Fator de potência         [merged W:Y]
+      //    Z  = Rendimento (%)            [merged Z:AB]
+      //    AC = DHT (%)                   [merged AC:AE]
 
-      const ws0 = workbook.worksheets[0];
-      if (ws0) {
-        // Módulos (linhas 7–16)
-        if (Array.isArray(data.modules)) {
-          data.modules.forEach((mod: any, idx: number) => {
-            if (idx >= 10) return;
-            const row = 7 + idx;
-            const potW      = Number(mod.potencia || 0);
-            const qtd       = Number(mod.qtd || 0);
-            const totalKwp  = (potW * qtd) / 1000;
-            const area      = Number(mod.area || 0);
-            const totalArea = area * qtd;
+      // Módulos (linhas 7–16)
+      if (Array.isArray(data.modules)) {
+        data.modules.forEach((mod: any, idx: number) => {
+          if (idx >= 10) return;
+          const row = 7 + idx;
+          const potW      = Number(mod.potencia || 0);
+          const qtd       = Number(mod.qtd || 0);
+          const totalKwp  = (potW * qtd) / 1000;
+          const area      = Number(mod.area || 0);
+          const totalArea = area * qtd;
 
-            setCellValue(ws0, `C${row}`, idx + 1);
-            setCellValue(ws0, `D${row}`, potW);
-            setCellValue(ws0, `H${row}`, qtd);
-            setCellValue(ws0, `K${row}`, totalKwp);
-            setCellValue(ws0, `P${row}`, totalArea > 0 ? totalArea : null);
-            setCellValue(ws0, `T${row}`, String(mod.fabricante || '').toUpperCase());
-            setCellValue(ws0, `AA${row}`, String(mod.modelo || '').toUpperCase());
-          });
-        }
-
-        // Inversores (linhas 22–51)
-        if (Array.isArray(data.inverters)) {
-          data.inverters.forEach((inv: any, idx: number) => {
-            if (idx >= 30) return;
-            const row    = 22 + idx;
-            const potKw  = Number(inv.potencia_nominal_kw || inv.potencia || 0);
-            const tensao = Number(inv.tensao_ca_nominal || inv.tensao || 220);
-
-            setCellValue(ws0, `C${row}`, idx + 1);
-            setCellValue(ws0, `D${row}`, String(inv.fabricante || '').toUpperCase());
-            setCellValue(ws0, `H${row}`, String(inv.modelo || '').toUpperCase());
-            setCellValue(ws0, `L${row}`, potKw);
-            setCellValue(ws0, `P${row}`, tensao);
-            setCellValue(ws0, `T${row}`, inv.corrente_ca_max ? Number(inv.corrente_ca_max) : null);
-            setCellValue(ws0, `W${row}`, inv.fator_potencia ? String(inv.fator_potencia) : '>0,99');
-            setCellValue(ws0, `Z${row}`, inv.eficiencia_max ? Number(inv.eficiencia_max) : null);
-            setCellValue(ws0, `AC${row}`, inv.thd ? String(inv.thd) : '<3%');
-          });
-        }
+          setCellValue(ws0, `C${row}`, idx + 1);
+          setCellValue(ws0, `D${row}`, potW);
+          setCellValue(ws0, `H${row}`, qtd);
+          setCellValue(ws0, `K${row}`, totalKwp);
+          setCellValue(ws0, `P${row}`, totalArea > 0 ? totalArea : null);
+          setCellValue(ws0, `T${row}`, String(mod.fabricante || '').toUpperCase());
+          setCellValue(ws0, `AA${row}`, String(mod.modelo || '').toUpperCase());
+        });
       }
 
-      // ── ABA 1: Dados Cadastrais ────────────────────────────────────────────
+      // Inversores (linhas 22–51)
+      if (Array.isArray(data.inverters)) {
+        data.inverters.forEach((inv: any, idx: number) => {
+          if (idx >= 30) return;
+          const row   = 22 + idx;
+          const potKw = Number(inv.potencia_nominal_kw || inv.potencia || 0);
+          const tensao = Number(inv.tensao_ca_nominal || inv.tensao || 220);
+
+          setCellValue(ws0, `C${row}`, idx + 1);
+          setCellValue(ws0, `D${row}`, String(inv.fabricante || '').toUpperCase());
+          setCellValue(ws0, `H${row}`, String(inv.modelo || '').toUpperCase());
+          setCellValue(ws0, `L${row}`, potKw);
+          setCellValue(ws0, `P${row}`, tensao);
+          setCellValue(ws0, `T${row}`, inv.corrente_ca_max ? Number(inv.corrente_ca_max) : null);
+          setCellValue(ws0, `W${row}`, inv.fator_potencia ? String(inv.fator_potencia) : '>0,99');
+          setCellValue(ws0, `Z${row}`, inv.eficiencia_max ? Number(inv.eficiencia_max) : null);
+          setCellValue(ws0, `AC${row}`, inv.thd ? String(inv.thd) : '<3%');
+        });
+      }
+
+      // ── ABA "1": Dados Cadastrais ──────────────────────────────────────────
       //
       //  DADOS DO CLIENTE
       //    C10  = Nome do cliente
@@ -176,76 +169,74 @@ export const NativeGenerator = {
       //    V15  = E-mail   T13 = Celular
       //
       //  UNIDADE CONSUMIDORA
-      //    Z17 = Conta contrato   F29 = Carga declarada   P29 = Disjuntor
-      //    F31 = Tipo ramal       H33 = Poste             L33 / T33 = Coords
-      //    F27 = Tensão           L27 = Tipo ligação
+      //    Z17  = Conta contrato
+      //    F27  = Tensão de atendimento     L27 = Tipo de ligação
+      //    F29  = Carga declarada           P29 = Disjuntor
+      //    F31  = Tipo ramal                H33 = Nº poste
+      //    L33  = Coordenada X              T33 = Coordenada Y
       //
-      //  GERAÇÃO DISTRIBUÍDA
-      //    G49 = Fonte primária   G51 = Tipo geração   G53 = Enquadramento
-      //    AC53 = kWp total       AC57 = kW inversores
+      //  GERAÇÃO DISTRIBUÍDA (seção 3)
+      //    G49  = Fonte primária
+      //    G51  = Tipo de geração
+      //    I53  = Modalidade de compensação (enquadramento)
+      //    AC53 = Potência de geração (kWp total módulos)
       //
       //  RESPONSÁVEL TÉCNICO
-      //    C38 = Nome    M38 = Título    Y38 = Registro
-      //    C41 = Email   S41 = Celular
-      //    C44 = Endereço   H44 = Bairro   P44 = Cidade   AB43 = UF   W44 = CEP
+      //    C38 = Nome       M38 = Título     Y38 = Registro
+      //    C41 = E-mail     S41 = Celular
+      //    C44 = Endereço   H44 = Bairro     P44 = Cidade
+      //    AB43 = UF        AB44 = CEP
 
-      const ws1 = workbook.worksheets[1];
-      if (ws1) {
-        const totalModPower = (data.modules || []).reduce(
-          (acc: number, m: any) => acc + (Number(m.potencia) * Number(m.qtd) / 1000), 0
-        );
-        const totalInvPower = (data.inverters || []).reduce(
-          (acc: number, i: any) => acc + (Number(i.potencia_nominal_kw || i.potencia || 0) * (Number(i.qtd) || 1)), 0
-        );
+      const totalModPower = (data.modules || []).reduce(
+        (acc: number, m: any) => acc + (Number(m.potencia) * Number(m.qtd) / 1000), 0
+      );
 
-        const set = (cellRef: string, key: string, transform?: (v: any) => any) => {
-          const val = data[key];
-          if (val !== undefined && val !== null && val !== '') {
-            setCellValue(ws1, cellRef, transform ? transform(val) : typeof val === 'string' ? val.toUpperCase() : val);
-          }
-        };
+      const set = (cellRef: string, key: string, transform?: (v: any) => any) => {
+        const val = data[key];
+        if (val !== undefined && val !== null && val !== '') {
+          setCellValue(ws1, cellRef, transform ? transform(val) : typeof val === 'string' ? val.toUpperCase() : val);
+        }
+      };
 
-        // Dados do cliente
-        set('C10', 'nome_cliente');
-        set('R10', 'cpf_cnpj');
-        set('AC9', 'rg');
-        set('C13', 'endereco');
-        set('D15', 'cep');
-        set('I15', 'cidade');
-        set('Q15', 'uf');
-        set('V15', 'email');
-        set('T13', 'celular');
+      // Dados do cliente
+      set('C10', 'nome_cliente');
+      set('R10', 'cpf_cnpj');
+      set('AC9', 'rg');
+      set('C13', 'endereco');
+      set('D15', 'cep');
+      set('I15', 'cidade');
+      set('Q15', 'uf');
+      set('V15', 'email');
+      set('T13', 'celular');
 
-        // Unidade consumidora
-        set('Z17', 'conta_contrato');
-        set('F29', 'carga_declarada');
-        set('P29', 'disjuntor_entrada');
-        set('F31', 'tipo_ramal');
-        set('H33', 'numero_poste');
-        set('L33', 'coordenada_x');
-        set('T33', 'coordenada_y');
-        set('F27', 'tensao_atendimento');
-        set('L27', 'tipo_ligacao');
+      // Unidade consumidora
+      set('Z17', 'conta_contrato');
+      set('F27', 'tensao_atendimento');
+      set('L27', 'tipo_ligacao');
+      set('F29', 'carga_declarada');
+      set('P29', 'disjuntor_entrada');
+      set('F31', 'tipo_ramal');
+      set('H33', 'numero_poste');
+      set('L33', 'coordenada_x');
+      set('T33', 'coordenada_y');
 
-        // Geração distribuída
-        setCellValue(ws1, 'G49', 'SOLAR FOTOVOLTAICA');
-        setCellValue(ws1, 'G51', 'EMPREGANDO CONVERSOR ELETRÔNICO/INVERSOR');
-        set('G53', 'enquadramento');
-        setCellValue(ws1, 'AC53', totalModPower);
-        setCellValue(ws1, 'AC57', totalInvPower);
+      // Geração distribuída
+      setCellValue(ws1, 'G49', 'SOLAR FOTOVOLTAICA');
+      setCellValue(ws1, 'G51', 'EMPREGANDO CONVERSOR ELETRÔNICO/INVERSOR');
+      set('I53', 'enquadramento');
+      setCellValue(ws1, 'AC53', totalModPower);
 
-        // Responsável técnico
-        set('C38', 'resp_tecnico_nome');
-        set('M38', 'resp_tecnico_titulo');
-        set('Y38', 'resp_tecnico_registro');
-        set('C41', 'resp_tecnico_email');
-        set('S41', 'resp_tecnico_celular');
-        set('C44', 'resp_tecnico_endereco');
-        set('H44', 'resp_tecnico_bairro');
-        set('P44', 'resp_tecnico_cidade');
-        set('AB43', 'resp_tecnico_uf');
-        set('W44', 'resp_tecnico_cep');
-      }
+      // Responsável técnico
+      set('C38', 'resp_tecnico_nome');
+      set('M38', 'resp_tecnico_titulo');
+      set('Y38', 'resp_tecnico_registro');
+      set('C41', 'resp_tecnico_email');
+      set('S41', 'resp_tecnico_celular');
+      set('C44', 'resp_tecnico_endereco');
+      set('H44', 'resp_tecnico_bairro');
+      set('P44', 'resp_tecnico_cidade');
+      set('AB43', 'resp_tecnico_uf');
+      set('AB44', 'resp_tecnico_cep');
 
       // Salvar arquivo
       const filename = `Anexo_I_${(data.nome_cliente || 'Projeto').replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`;
@@ -293,7 +284,6 @@ export const NativeGenerator = {
         cidade:                   data.cidade || '',
         uf:                       data.uf || '',
         cep:                      data.cep || '',
-        // Usa travessão (–) para manter padrão do template oficial
         cidade_uf:                `${data.cidade || ''} \u2013 ${data.uf || ''}`,
         estado:                   getEstadoExtenso(data.uf || ''),
         estado_extenso:           getEstadoExtenso(data.uf || ''),
@@ -301,7 +291,6 @@ export const NativeGenerator = {
         resp_tecnico_nome:        data.resp_tecnico_nome || '',
         resp_tecnico_titulo:      data.resp_tecnico_titulo || '',
         resp_tecnico_registro:    data.resp_tecnico_registro || '',
-        // Formato: "ABRIL – 2026" (mês maiúsculo + travessão + ano)
         data_extenso:             formatDataExtenso(),
         classe_uc:                data.classe_uc || 'Residencial',
         conta_contrato:           data.conta_contrato || '',
@@ -315,11 +304,9 @@ export const NativeGenerator = {
         potencia_disponibilizada: data.potencia_disponibilizada || '',
         carga_declarada:          data.carga_declarada || '',
 
-        // Arrays para loops no template
         modules:  data.modules  || [],
         inverters: data.inverters || [],
 
-        // Campos flat do primeiro módulo (para seções não-loop)
         mod_fabricante:  data.modules?.[0]?.fabricante  || '',
         mod_modelo:      data.modules?.[0]?.modelo      || '',
         mod_potencia:    data.modules?.[0]?.potencia    || '',
@@ -334,7 +321,6 @@ export const NativeGenerator = {
         mod_peso:        data.modules?.[0]?.peso        || '',
         mod_quantidade:  data.modules?.reduce((acc: number, m: any) => acc + (m.qtd || 0), 0) || 0,
 
-        // Campos flat do primeiro inversor (para seções não-loop)
         inv_fabricante:        data.inverters?.[0]?.fabricante        || '',
         inv_modelo:            data.inverters?.[0]?.modelo            || '',
         inv_quantidade:        data.inverters?.reduce((acc: number, i: any) => acc + (i.qtd || 0), 0) || 0,
