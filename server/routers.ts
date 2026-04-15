@@ -443,8 +443,8 @@ export const appRouter = router({
               projectId: project.id,
               accountContract: ratio.targetUnit,
               percentageKwh: ratio.percentage,
-              address: "Não Informado", // Default
-              consumptionClass: "Residencial", // Default
+              address: "Não Informado",
+              consumptionClass: "Residencial",
               order: index++,
             });
           }
@@ -512,7 +512,6 @@ export const appRouter = router({
 
         await db.updateProject(input.id, projectData);
 
-        // Update Module Arrays (Full Replacement)
         if (moduleArrays) {
           await db.deleteProjectModuleArraysByProjectId(input.id);
           for (const ma of moduleArrays) {
@@ -525,7 +524,6 @@ export const appRouter = router({
           }
         }
 
-        // Update Inverters (Full Replacement)
         if (inverters) {
           await db.deleteProjectInvertersByProjectId(input.id);
           for (const inv of inverters) {
@@ -537,7 +535,6 @@ export const appRouter = router({
           }
         }
 
-        // Update Ratio List (Full Replacement)
         if (ratioList) {
           await db.deleteProjectRatioListByProjectId(input.id);
           let index = 1;
@@ -546,8 +543,8 @@ export const appRouter = router({
               projectId: input.id,
               accountContract: ratio.targetUnit,
               percentageKwh: ratio.percentage,
-              address: "Não Informado", // Default
-              consumptionClass: "Residencial", // Default
+              address: "Não Informado",
+              consumptionClass: "Residencial",
               order: index++,
             });
           }
@@ -578,68 +575,91 @@ export const appRouter = router({
         const technicalResponsible = await db.getTechnicalResponsibleById(project.technicalResponsibleId);
         if (!technicalResponsible) throw new Error("RT not found");
 
-        // Buscar módulos
         const projectModules = await db.getProjectModuleArraysByProjectId(project.id);
         const modulesData = await Promise.all(projectModules.map(async (pm) => {
           const module = await db.getSolarModuleById(pm.solarModuleId);
-          return {
-            ...pm,
-            module
-          };
+          return { ...pm, module };
         }));
 
-        // Buscar inversores
         const projectInverters = await db.getProjectInvertersByProjectId(project.id);
         const invertersData = await Promise.all(projectInverters.map(async (pi) => {
           const inverter = await db.getInverterById(pi.inverterId);
-          return {
-            ...pi,
-            inverter
-          };
+          return { ...pi, inverter };
         }));
 
-        // Formatar para Generator
         const generatorData = {
-          nome_cliente: client.name,
-          endereco: client.address,
-          cidade: client.city,
-          uf: client.state,
-          cep: client.cep || "",
-          rg: client.rg || "",
-          rg_data_emissao: "", // Precisa adicionar no DB se quiser
-          cpf_cnpj: client.cpfCnpj,
-          carga_declarada: "10", // Default ou do projeto
-          unidade_potencia: "kW",
+          // Cliente
+          nome_cliente:   client.name,
+          cpf_cnpj:       client.cpfCnpj,
+          rg:             client.rg || '',
+          endereco:       client.address,
+          cep:            client.cep || '',
+          cidade:         client.city,
+          uf:             client.state,
+          email:          client.email || '',
+          celular:        client.phone || client.landline || '',
+
+          // Unidade consumidora
+          conta_contrato:      project.accountContract || '',
+          carga_declarada:     project.declaredLoad || '',
+          disjuntor_entrada:   project.entryBreakerCurrent?.toString() || '',
+          tipo_ramal:          project.branchType || '',
+          numero_poste:        project.nearestPoleNumber || '',
+          coordenada_x:        project.coordinateX || '',
+          coordenada_y:        project.coordinateY || '',
+          tensao_atendimento:  project.serviceVoltage?.toString() || '',
+          tipo_ligacao:        project.connectionType || '',
+          enquadramento:       project.classification || '',
+
+          // Totais
           potencia_total_kw: (project.totalInstalledPower / 1000).toFixed(2),
-          resp_tecnico_nome: technicalResponsible.name,
-          resp_tecnico_titulo: technicalResponsible.title,
-          resp_tecnico_registro: technicalResponsible.registrationNumber || "",
+
+          // Responsável técnico
+          resp_tecnico_nome:     technicalResponsible.name,
+          resp_tecnico_titulo:   technicalResponsible.title,
+          resp_tecnico_registro: technicalResponsible.registrationNumber || '',
+          resp_tecnico_email:    technicalResponsible.email || '',
+          resp_tecnico_celular:  technicalResponsible.mobile || technicalResponsible.phone || '',
+          resp_tecnico_endereco: technicalResponsible.address || '',
+          resp_tecnico_bairro:   technicalResponsible.neighborhood || '',
+          resp_tecnico_cidade:   technicalResponsible.city || '',
+          resp_tecnico_uf:       technicalResponsible.state || '',
+          resp_tecnico_cep:      technicalResponsible.cep || '',
+
+          // Módulos
           modules: modulesData.map(item => ({
-            potencia: item.module?.nominalPower || 0,
-            qtd: item.quantity,
-            area: item.module?.area ? parseFloat(item.module.area) : 0,
-            fabricante: item.module?.manufacturer || "",
-            modelo: item.module?.model || ""
+            potencia:   item.module?.nominalPower || 0,
+            qtd:        item.quantity,
+            area:       item.module?.area ? parseFloat(item.module.area) : 0,
+            fabricante: item.module?.manufacturer || '',
+            modelo:     item.module?.model || '',
           })),
+
+          // Inversores
           inverters: invertersData.map(item => ({
-            fabricante: item.inverter?.manufacturer || "",
-            modelo: item.inverter?.model || "",
-            potencia_nominal_kw: item.inverter?.nominalPowerAC ? (item.inverter.nominalPowerAC / 1000) : 0,
-            qtd: item.quantity
-          }))
+            fabricante:            item.inverter?.manufacturer || '',
+            modelo:                item.inverter?.model || '',
+            potencia_nominal_kw:   item.inverter?.nominalPowerAC ? item.inverter.nominalPowerAC / 1000 : 0,
+            tensao_ca_nominal:     item.inverter?.nominalVoltageAC || '',
+            corrente_ca_max:       item.inverter?.maxCurrentAC || '',
+            fator_potencia:        item.inverter?.powerFactor || '',
+            eficiencia_max:        item.inverter?.maxEfficiency || '',
+            thd:                   item.inverter?.thdCurrent || '',
+            qtd:                   item.quantity,
+          })),
         };
 
-        console.log(`[Router] Gerando Excel NATIVO para projeto ${project.id}...`);
+        console.log(`[Router] Gerando Excel para projeto ${project.id}...`);
         const result = await NativeGenerator.generateExcel(generatorData);
 
         if (!result.success || !result.filePath) {
-          throw new Error(`Erro na automação Excel: ${result.error}`);
+          throw new Error(`Erro na geração do Excel: ${result.error}`);
         }
 
         const fileBuffer = await fs.readFile(result.filePath);
         return {
           filename: path.basename(result.filePath),
-          data: fileBuffer.toString('base64')
+          data: fileBuffer.toString('base64'),
         };
       }),
 
@@ -655,69 +675,123 @@ export const appRouter = router({
         const technicalResponsible = await db.getTechnicalResponsibleById(project.technicalResponsibleId);
         if (!technicalResponsible) throw new Error("RT not found");
 
-        // Buscar módulos
         const projectModules = await db.getProjectModuleArraysByProjectId(project.id);
         const modulesData = await Promise.all(projectModules.map(async (pm) => {
           const module = await db.getSolarModuleById(pm.solarModuleId);
-          return {
-            ...pm,
-            module
-          };
+          return { ...pm, module };
         }));
 
-        // Buscar Inversores
         const projectInverters = await db.getProjectInvertersByProjectId(project.id);
         const invertersData = await Promise.all(projectInverters.map(async (pi) => {
           const inverter = await db.getInverterById(pi.inverterId);
-          return {
-            ...pi,
-            inverter
-          };
+          return { ...pi, inverter };
         }));
 
         const generatorData = {
-          nome_cliente: client.name,
-          endereco: client.address,
-          cidade: client.city,
-          uf: client.state,
-          rg: client.rg || "PENDENTE",
-          cpf_cnpj: client.cpfCnpj,
+          // Cliente
+          nome_cliente:   client.name,
+          cpf_cnpj:       client.cpfCnpj,
+          rg:             client.rg || 'PENDENTE',
+          endereco:       client.address,
+          cep:            client.cep || '',
+          cidade:         client.city,
+          uf:             client.state,
+          email:          client.email || '',
+          celular:        client.phone || client.landline || '',
+
+          // Unidade consumidora
+          conta_contrato:         project.accountContract || '',
+          carga_declarada:        project.declaredLoad?.toString().replace('.', ',') || '0,00',
+          disjuntor_entrada:      project.entryBreakerCurrent?.toString() || '',
+          tipo_ramal:             project.branchType || '',
+          numero_poste:           project.nearestPoleNumber || '',
+          coordenada_x:           project.coordinateX || '',
+          coordenada_y:           project.coordinateY || '',
+          coordenadas:            project.coordinateX && project.coordinateY
+            ? `${project.coordinateX}, ${project.coordinateY}`
+            : '',
+          tensao_atendimento:     project.serviceVoltage?.toString() || '220',
+          tipo_ligacao:           project.connectionType || 'MONOFÁSICO',
+          potencia_disponibilizada: project.availablePower?.toString().replace('.', ',') || '0,00',
+          enquadramento:          project.classification || 'AUTOCONSUMO LOCAL',
+          classe_uc:              client.consumptionClass || 'Residencial',
+
+          // Totais
           potencia_total_kw: (project.totalInstalledPower / 1000).toFixed(2).replace('.', ','),
-          resp_tecnico_nome: technicalResponsible.name,
-          resp_tecnico_titulo: technicalResponsible.title,
+
+          // Responsável técnico
+          resp_tecnico_nome:     technicalResponsible.name,
+          resp_tecnico_titulo:   technicalResponsible.title,
           resp_tecnico_registro: technicalResponsible.registrationNumber,
-          data_extenso: new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase(),
-          enquadramento: project.classification || "AUTOCONSUMO LOCAL", // Mapeamento
-          tensao_atendimento: project.serviceVoltage?.toString() || "220",
-          tipo_ligacao: project.connectionType || "MONOFÁSICO",
-          potencia_disponibilizada: project.availablePower?.toString().replace('.', ',') || "0,00",
-          carga_declarada: project.declaredLoad?.toString().replace('.', ',') || "0,00",
+          resp_tecnico_email:    technicalResponsible.email || '',
+          resp_tecnico_celular:  technicalResponsible.mobile || technicalResponsible.phone || '',
+          resp_tecnico_endereco: technicalResponsible.address || '',
+          resp_tecnico_bairro:   technicalResponsible.neighborhood || '',
+          resp_tecnico_cidade:   technicalResponsible.city || '',
+          resp_tecnico_uf:       technicalResponsible.state || '',
+          resp_tecnico_cep:      technicalResponsible.cep || '',
+
+          data_extenso: new Date().toLocaleDateString('pt-BR', {
+            month: 'long', year: 'numeric',
+          }).toUpperCase(),
+
+          // Módulos
           modules: modulesData.map(item => ({
-            potencia: item.module?.nominalPower || 0,
-            qtd: item.quantity,
-            area: item.module?.area ? parseFloat(item.module.area).toFixed(2).replace('.', ',') : "0,00",
-            fabricante: item.module?.manufacturer || "",
-            modelo: item.module?.model || ""
+            potencia:    item.module?.nominalPower || 0,
+            qtd:         item.quantity,
+            area:        item.module?.area ? parseFloat(item.module.area).toFixed(2).replace('.', ',') : '0,00',
+            area_fmt:    item.module?.area ? parseFloat(item.module.area).toFixed(2).replace('.', ',') : '0,00',
+            fabricante:  item.module?.manufacturer || '',
+            modelo:      item.module?.model || '',
+            voc:         item.module?.voc || '',
+            isc:         item.module?.isc || '',
+            vmpp:        item.module?.vmpp || '',
+            impp:        item.module?.impp || '',
+            eficiencia:  item.module?.efficiency || '',
+            comprimento: item.module?.length || '',
+            largura:     item.module?.width || '',
+            peso:        item.module?.weight || '',
           })),
+
+          // Inversores
           inverters: invertersData.map(item => ({
-            fabricante: item.inverter?.manufacturer || "",
-            modelo: item.inverter?.model || "",
-            potencia_nominal_kw: item.inverter?.nominalPowerAC || 0,
-            qtd: 1
-          }))
+            fabricante:            item.inverter?.manufacturer || '',
+            modelo:                item.inverter?.model || '',
+            potencia_nominal_kw:   item.inverter?.nominalPowerAC || 0,
+            potencia_nominal_kw_fmt: item.inverter?.nominalPowerAC
+              ? (item.inverter.nominalPowerAC / 1000).toFixed(2).replace('.', ',')
+              : '0,00',
+            potencia_max_cc:       item.inverter?.maxPowerDC?.toString() || '',
+            tensao_cc_max:         item.inverter?.maxVoltageDC || '',
+            tensao_mppt_max:       item.inverter?.mpptVoltageMax || '',
+            tensao_mppt_min:       item.inverter?.mpptVoltageMin || '',
+            tensao_partida:        item.inverter?.startupVoltageDC || '',
+            tensao_ca_nominal:     item.inverter?.nominalVoltageAC || '',
+            corrente_cc_max:       item.inverter?.maxCurrentDC || '',
+            corrente_ca_max:       item.inverter?.maxCurrentAC || '',
+            num_mppt:              item.inverter?.numberOfMppt?.toString() || '',
+            num_strings:           item.inverter?.numberOfStrings?.toString() || '',
+            frequencia:            item.inverter?.nominalFrequency || '',
+            eficiencia_max:        item.inverter?.maxEfficiency || '',
+            eficiencia_eu:         item.inverter?.euEfficiency || '',
+            fator_potencia:        item.inverter?.powerFactor || '',
+            thd:                   item.inverter?.thdCurrent || '',
+            tipo_conexao:          item.inverter?.connectionType || '',
+            qtd:                   item.quantity,
+          })),
         };
 
-        console.log(`[Router] Gerando Word NATIVO para projeto ${project.id}...`);
+        console.log(`[Router] Gerando Word para projeto ${project.id}...`);
         const result = await NativeGenerator.generateWord(generatorData);
 
         if (!result.success || !result.filePath) {
-          throw new Error(`Erro na automação Word: ${result.error}`);
+          throw new Error(`Erro na geração do Word: ${result.error}`);
         }
 
         const fileBuffer = await fs.readFile(result.filePath);
         return {
           filename: path.basename(result.filePath),
-          data: fileBuffer.toString('base64')
+          data: fileBuffer.toString('base64'),
         };
       }),
 
@@ -733,40 +807,22 @@ export const appRouter = router({
         const technicalResponsible = await db.getTechnicalResponsibleById(project.technicalResponsibleId);
         if (!technicalResponsible) throw new Error("Dados incompletos do projeto: Responsável Técnico não encontrado");
 
-        // Buscar dados de Inversores e Módulos para preencher o diagrama
         const projectModules = await db.getProjectModuleArraysByProjectId(project.id);
         const moduleArrays = await Promise.all(projectModules.map(async (pm, index) => {
           const module = await db.getSolarModuleById(pm.solarModuleId);
           if (!module) throw new Error(`Módulo não encontrado para o ID ${pm.solarModuleId}`);
-          return {
-            module,
-            quantity: pm.quantity,
-            arrayNumber: index + 1
-          };
+          return { module, quantity: pm.quantity, arrayNumber: index + 1 };
         }));
 
         const projectInverters = await db.getProjectInvertersByProjectId(project.id);
         const inverters = await Promise.all(projectInverters.map(async (pi) => {
           const inverter = await db.getInverterById(pi.inverterId);
           if (!inverter) throw new Error(`Inversor não encontrado para o ID ${pi.inverterId}`);
-          return {
-            inverter,
-            quantity: 1 // Assumindo 1 por item na tabela de relação, ou ajustar se houver campo quantidade
-          };
+          return { inverter, quantity: 1 };
         }));
 
-        console.log(`[Router] Gerando Diagrama PDF NATIVO para projeto ${project.id}...`);
-
-        // Dados Typed para o gerador
-        const projectData = {
-          project,
-          client,
-          technicalResponsible,
-          moduleArrays,
-          inverters
-        };
-
-        const pdfBuffer = await generatePDFDiagram(projectData);
+        console.log(`[Router] Gerando Diagrama PDF para projeto ${project.id}...`);
+        const pdfBuffer = await generatePDFDiagram({ project, client, technicalResponsible, moduleArrays, inverters });
 
         return {
           data: pdfBuffer.toString('base64'),
@@ -775,7 +831,7 @@ export const appRouter = router({
       }),
   }),
 
-  // Validation router
+  // ==================== VALIDATION ====================
   validation: router({
     checkCompatibility: protectedProcedure
       .input(z.object({
@@ -848,7 +904,7 @@ export const appRouter = router({
       }),
   }),
 
-  // Datasheet parser router
+  // ==================== DATASHEET ====================
   datasheet: router({
     parse: protectedProcedure
       .input(z.object({
