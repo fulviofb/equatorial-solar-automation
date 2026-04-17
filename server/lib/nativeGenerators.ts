@@ -33,13 +33,77 @@ function formatDataExtenso(): string {
 }
 
 function gerarDescricaoSistema(modules: any[], inverters: any[]): string {
+  const totalMods = modules.reduce((acc, m) => acc + (m.qtd || 0), 0);
   const modDesc = modules.length > 0
-    ? `${modules.reduce((acc, m) => acc + (m.qtd || 0), 0)} módulos ${modules[0].fabricante} de ${modules[0].potencia}W`
+    ? `${totalMods} módulos ${modules[0].fabricante}, modelo ${modules[0].modelo} de ${modules[0].potencia}W`
     : 'Sem módulos';
+  const totalInvs = inverters.reduce((acc, i) => acc + (i.qtd || 0), 0);
   const invDesc = inverters.length > 0
-    ? `${inverters.reduce((acc, i) => acc + (i.qtd || 0), 0)} inversores ${inverters[0].fabricante} de ${inverters[0].potencia_nominal_kw}kW`
+    ? `${totalInvs} inversores marca ${inverters[0].fabricante}, modelo ${inverters[0].modelo}`
     : 'Sem inversores';
   return `${modDesc} ligados a ${invDesc}`;
+}
+
+/**
+ * Retorna o número de fases com base no tipo de ligação.
+ * MONOFÁSICO/BIFÁSICO → "1", TRIFÁSICO → "√3"
+ */
+function getNumFases(tipoLigacao: string): string {
+  return tipoLigacao?.toUpperCase().includes('TRIFÁSICO') ? '√3' : '1';
+}
+
+/**
+ * Normaliza o tipo de ligação para minúsculas sem acento para uso em texto corrido.
+ * Ex: "TRIFÁSICO" → "trifásico"
+ */
+function tipoLigacaoLower(tipoLigacao: string): string {
+  return (tipoLigacao || 'monofásico').toLowerCase();
+}
+
+/**
+ * Pré-processa o ZIP do template Word substituindo textos hardcoded por tags {{}}
+ * diretamente no XML, antes do docxtemplater renderizar.
+ *
+ * Isso é necessário porque o template DOCX tem alguns campos com texto fixo
+ * (ex: "HONOR", "monofásico", "11517621") que deveriam ser tags mas não foram
+ * substituídos quando o template foi criado.
+ */
+function patchTemplateXml(zip: PizZip, data: Record<string, string>): void {
+  const docXmlFile = zip.files['word/document.xml'];
+  if (!docXmlFile) return;
+
+  let xml = docXmlFile.asText();
+
+  // Substituições: texto hardcoded → valor real do projeto
+  const substitutions: [string, string][] = [
+    // Módulo na seção "Objetivo" e Tabela 3
+    [' 10 módulos HONOR, modelo HY-M12/132G de 700W ligados a 3 inversores marca FOXESS, modelo Q1-2500-E Certificado de Conformidade n° 004468/2025',
+     ` ${data.descricao_sistema}`],
+    // Tabela 3 - células individuais
+    ['>HONOR<', `>${data.mod_fabricante}<`],
+    ['>HY-M12/132G<', `>${data.mod_modelo}<`],
+    // Conta contrato na seção 3
+    ['>Número da Conta Contrato: 11517621<', `>Número da Conta Contrato: ${data.conta_contrato}<`],
+    // Tipo de ligação (seções 5.1, 5.4, 5.5) — todas as ocorrências em vermelho
+    ['xml:space="preserve">monofásico </w:t>', `xml:space="preserve">${data.tipo_ligacao_lower} </w:t>`],
+    ['xml:space="preserve">monofásica </w:t>', `xml:space="preserve">${data.tipo_ligacao_lower} </w:t>`],
+    // Potência disponibilizada - fórmula (seção 5.3)
+    ['xml:space="preserve"> = XXX V</w:t>', `xml:space="preserve"> = ${data.tensao_atendimento} V</w:t>`],
+    ['xml:space="preserve"> = XXX A </w:t>', `xml:space="preserve"> = ${data.disjuntor_entrada} A </w:t>`],
+    ['>NF = X<', `>NF = ${data.num_fases}<`],
+    ['xml:space="preserve">FP = XXX </w:t>', `xml:space="preserve">FP = 0,92 </w:t>`],
+  ];
+
+  let count = 0;
+  for (const [from, to] of substitutions) {
+    if (from && xml.includes(from)) {
+      xml = xml.split(from).join(to);
+      count++;
+    }
+  }
+
+  console.log(`[NativeGenerator] Patch do template: ${count}/${substitutions.length} substituições aplicadas`);
+  zip.file('word/document.xml', xml);
 }
 
 /**
@@ -56,12 +120,10 @@ function setCellValue(ws: ExcelJS.Worksheet, cellRef: string, value: any) {
 
 /**
  * Limpa uma célula — zera o valor sem tocar em fórmulas, formatação ou validação.
- * Preserva células que contenham fórmulas (value começa com '=').
  */
 function clearCell(ws: ExcelJS.Worksheet, cellRef: string) {
   const cell = ws.getCell(cellRef);
   const val = cell.value;
-  // Não apagar fórmulas nativas do template
   if (typeof val === 'string' && val.startsWith('=')) return;
   if ((cell as any).isMerged && (cell as any).master) {
     const master = (cell as any).master;
@@ -75,11 +137,9 @@ function clearCell(ws: ExcelJS.Worksheet, cellRef: string) {
 
 /**
  * Limpa todos os campos de dados das abas "0", "1" e "2" do template antes de
- * escrever os dados do projeto. Isso garante que valores de exemplo do template
- * não apareçam no arquivo gerado.
+ * escrever os dados do projeto.
  */
 function clearTemplateData(ws0: ExcelJS.Worksheet, ws1: ExcelJS.Worksheet, ws2?: ExcelJS.Worksheet | undefined) {
-  // ── ABA "0": módulos (linhas 7-16) e inversores (linhas 22-51) ──
   for (let row = 7; row <= 16; row++) {
     for (const col of ['C','D','H','K','P','T','AA']) {
       clearCell(ws0, `${col}${row}`);
@@ -91,16 +151,11 @@ function clearTemplateData(ws0: ExcelJS.Worksheet, ws1: ExcelJS.Worksheet, ws2?:
     }
   }
 
-  // ── ABA "1": todos os campos de dados do cliente, UC, GD e RT ──
   const cellsAba1 = [
-    // Cliente
     'C10','R10','AC9','C13','T13',
     'D15','I15','Q15','V15',
-    // UC
     'Z17','F27','L27','F29','P29','F31','H33','L33','T33',
-    // Geração distribuída
     'G49','G51','I53','AC53',
-    // Responsável técnico
     'C38','M38','Y38','C41','S41',
     'C44','H44','P44','AB43','AB44',
   ];
@@ -108,7 +163,6 @@ function clearTemplateData(ws0: ExcelJS.Worksheet, ws1: ExcelJS.Worksheet, ws2?:
     clearCell(ws1, ref);
   }
 
-  // ── ABA "2": dados de rateio (se existir e se o projeto usar rateio) ──
   if (ws2) {
     for (const ref of ['G3','K3','F4','M4','G5']) {
       clearCell(ws2, ref);
@@ -153,8 +207,6 @@ export const NativeGenerator = {
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.readFile(TEMPLATE_EXCEL);
 
-      // O template tem 5 abas: ROTEIRO, "0", "1", "2", FONTES
-      // Acessar sempre pelo nome para evitar confusão de índice
       const ws0 = workbook.getWorksheet('0');
       const ws1 = workbook.getWorksheet('1');
       const ws2 = workbook.getWorksheet('2');
@@ -162,10 +214,9 @@ export const NativeGenerator = {
       if (!ws0) throw new Error('Aba "0" não encontrada no template Excel');
       if (!ws1) throw new Error('Aba "1" não encontrada no template Excel');
 
-      // Limpar dados de exemplo do template ANTES de escrever os novos dados
       clearTemplateData(ws0, ws1, ws2 ?? undefined);
 
-      // ── ABA "0": módulos (linhas 7–16) ────────────────────────────────────
+      // Módulos (linhas 7–16)
       if (Array.isArray(data.modules)) {
         data.modules.forEach((mod: any, idx: number) => {
           if (idx >= 10) return;
@@ -186,7 +237,7 @@ export const NativeGenerator = {
         });
       }
 
-      // ── ABA "0": inversores (linhas 22–51) ────────────────────────────────
+      // Inversores (linhas 22–51)
       if (Array.isArray(data.inverters)) {
         data.inverters.forEach((inv: any, idx: number) => {
           if (idx >= 30) return;
@@ -206,7 +257,7 @@ export const NativeGenerator = {
         });
       }
 
-      // ── ABA "1": dados cadastrais ──────────────────────────────────────────
+      // Aba 1 — dados cadastrais
       const totalModPower = (data.modules || []).reduce(
         (acc: number, m: any) => acc + (Number(m.potencia) * Number(m.qtd) / 1000), 0
       );
@@ -218,7 +269,6 @@ export const NativeGenerator = {
         }
       };
 
-      // Cliente
       set('C10', 'nome_cliente');
       set('R10', 'cpf_cnpj');
       set('AC9', 'rg');
@@ -228,8 +278,6 @@ export const NativeGenerator = {
       set('Q15', 'uf');
       set('V15', 'email');
       set('T13', 'celular');
-
-      // Unidade consumidora
       set('Z17', 'conta_contrato');
       set('F27', 'tensao_atendimento');
       set('L27', 'tipo_ligacao');
@@ -239,14 +287,10 @@ export const NativeGenerator = {
       set('H33', 'numero_poste');
       set('L33', 'coordenada_x');
       set('T33', 'coordenada_y');
-
-      // Geração distribuída
       setCellValue(ws1, 'G49', 'SOLAR FOTOVOLTAICA');
       setCellValue(ws1, 'G51', 'EMPREGANDO CONVERSOR ELETRÔNICO/INVERSOR');
       set('I53', 'enquadramento');
       setCellValue(ws1, 'AC53', totalModPower);
-
-      // Responsável técnico
       set('C38', 'resp_tecnico_nome');
       set('M38', 'resp_tecnico_titulo');
       set('Y38', 'resp_tecnico_registro');
@@ -258,7 +302,6 @@ export const NativeGenerator = {
       set('AB43', 'resp_tecnico_uf');
       set('AB44', 'resp_tecnico_cep');
 
-      // Salvar arquivo
       const filename = `Anexo_I_${(data.nome_cliente || 'Projeto').replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`;
       const isVercel = process.env.VERCEL || process.env.VERCEL_ENV;
       const outputDir = isVercel ? os.tmpdir() : OUTPUT_DIR_EXCEL;
@@ -290,6 +333,24 @@ export const NativeGenerator = {
       const content = fs.readFileSync(TEMPLATE_WORD, 'binary');
       const zip = new PizZip(content);
 
+      // Derivar variáveis extras que o template precisa
+      const tipoLig = data.tipo_ligacao || 'MONOFÁSICO';
+      const descSistema = gerarDescricaoSistema(data.modules || [], data.inverters || []);
+      const modFabricante = (data.modules?.[0]?.fabricante || '').toUpperCase();
+      const modModelo     = (data.modules?.[0]?.modelo     || '').toUpperCase();
+
+      // Pré-processar o XML para substituir textos hardcoded do template
+      patchTemplateXml(zip, {
+        descricao_sistema:    descSistema,
+        mod_fabricante:       modFabricante,
+        mod_modelo:           modModelo,
+        conta_contrato:       data.conta_contrato || '',
+        tipo_ligacao_lower:   tipoLigacaoLower(tipoLig),
+        tensao_atendimento:   data.tensao_atendimento || '',
+        disjuntor_entrada:    data.entryBreakerCurrent?.toString() || data.disjuntor_entrada || '',
+        num_fases:            getNumFases(tipoLig),
+      });
+
       const doc = new Docxtemplater(zip, {
         paragraphLoop: true,
         linebreaks: true,
@@ -298,7 +359,7 @@ export const NativeGenerator = {
 
       const templateData = {
         nome_cliente:             data.nome_cliente || '',
-        rg:                       data.rg || '',
+        rg:                       data.rg || 'PENDENTE',
         cpf_cnpj:                 data.cpf_cnpj || '',
         endereco:                 data.endereco || '',
         cidade:                   data.cidade || '',
@@ -320,15 +381,18 @@ export const NativeGenerator = {
         numero_poste:             data.numero_poste || '',
         enquadramento:            data.enquadramento || '',
         tensao_atendimento:       data.tensao_atendimento || '',
-        tipo_ligacao:             data.tipo_ligacao || '',
+        tipo_ligacao:             tipoLig,
+        tipo_ligacao_lower:       tipoLigacaoLower(tipoLig),
         potencia_disponibilizada: data.potencia_disponibilizada || '',
         carga_declarada:          data.carga_declarada || '',
+        num_fases:                getNumFases(tipoLig),
+        descricao_sistema:        descSistema,
 
         modules:  data.modules  || [],
         inverters: data.inverters || [],
 
-        mod_fabricante:  data.modules?.[0]?.fabricante  || '',
-        mod_modelo:      data.modules?.[0]?.modelo      || '',
+        mod_fabricante:  modFabricante,
+        mod_modelo:      modModelo,
         mod_potencia:    data.modules?.[0]?.potencia    || '',
         mod_voc:         data.modules?.[0]?.voc         || '',
         mod_isc:         data.modules?.[0]?.isc         || '',
@@ -341,28 +405,28 @@ export const NativeGenerator = {
         mod_peso:        data.modules?.[0]?.peso        || '',
         mod_quantidade:  data.modules?.reduce((acc: number, m: any) => acc + (m.qtd || 0), 0) || 0,
 
-        inv_fabricante:        data.inverters?.[0]?.fabricante        || '',
-        inv_modelo:            data.inverters?.[0]?.modelo            || '',
-        inv_quantidade:        data.inverters?.reduce((acc: number, i: any) => acc + (i.qtd || 0), 0) || 0,
-        inv_corrente_cc_max:   data.inverters?.[0]?.corrente_cc_max   || '',
-        inv_corrente_ca_max:   data.inverters?.[0]?.corrente_ca_max   || '',
-        inv_eficiencia_max:    data.inverters?.[0]?.eficiencia_max    || '',
-        inv_eficiencia_eu:     data.inverters?.[0]?.eficiencia_eu     || '',
-        inv_tipo_conexao:      data.inverters?.[0]?.tipo_conexao      || '',
+        inv_fabricante:          data.inverters?.[0]?.fabricante        || '',
+        inv_modelo:              data.inverters?.[0]?.modelo            || '',
+        inv_quantidade:          data.inverters?.reduce((acc: number, i: any) => acc + (i.qtd || 0), 0) || 0,
+        inv_corrente_cc_max:     data.inverters?.[0]?.corrente_cc_max   || '',
+        inv_corrente_ca_max:     data.inverters?.[0]?.corrente_ca_max   || '',
+        inv_eficiencia_max:      data.inverters?.[0]?.eficiencia_max    || '',
+        inv_eficiencia_eu:       data.inverters?.[0]?.eficiencia_eu     || '',
+        inv_tipo_conexao:        data.inverters?.[0]?.tipo_conexao      || '',
         inv_potencia_nominal_kw: data.inverters?.[0]?.potencia_nominal_kw_fmt || '',
-        inv_potencia_max_cc:   data.inverters?.[0]?.potencia_max_cc   || '',
-        inv_tensao_cc_max:     data.inverters?.[0]?.tensao_cc_max     || '',
-        inv_tensao_mppt_max:   data.inverters?.[0]?.tensao_mppt_max   || '',
-        inv_tensao_mppt_min:   data.inverters?.[0]?.tensao_mppt_min   || '',
-        inv_tensao_partida:    data.inverters?.[0]?.tensao_partida    || '',
-        inv_num_strings:       data.inverters?.[0]?.num_strings       || '',
-        inv_num_mppt:          data.inverters?.[0]?.num_mppt          || '',
-        inv_tensao_ca_nominal: data.inverters?.[0]?.tensao_ca_nominal || '',
-        inv_frequencia:        data.inverters?.[0]?.frequencia        || '',
-        inv_thd:               data.inverters?.[0]?.thd               || '',
-        inv_fator_potencia:    data.inverters?.[0]?.fator_potencia    || '',
-
-        descricao_sistema: gerarDescricaoSistema(data.modules || [], data.inverters || []),
+        inv_potencia_max_cc:     data.inverters?.[0]?.potencia_max_cc   || '',
+        inv_tensao_cc_max:       data.inverters?.[0]?.tensao_cc_max     || '',
+        inv_tensao_mppt_max:     data.inverters?.[0]?.tensao_mppt_max   || '',
+        inv_tensao_mppt_min:     data.inverters?.[0]?.tensao_mppt_min   || '',
+        inv_tensao_partida:      data.inverters?.[0]?.tensao_partida    || '',
+        inv_num_strings:         data.inverters?.[0]?.num_strings       || '',
+        inv_num_mppt:            data.inverters?.[0]?.num_mppt          || '',
+        inv_tensao_ca_nominal:   data.inverters?.[0]?.tensao_ca_nominal || '',
+        inv_frequencia:          data.inverters?.[0]?.frequencia        || '',
+        inv_thd:                 data.inverters?.[0]?.thd               || '',
+        inv_fator_potencia:      data.inverters?.[0]?.fator_potencia    || '',
+        inv_certif_numero:       data.inverters?.[0]?.certificationNumber || '',
+        certif_numero:           data.inverters?.[0]?.certificationNumber || '',
       };
 
       doc.render(templateData);
