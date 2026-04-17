@@ -44,7 +44,6 @@ function gerarDescricaoSistema(modules: any[], inverters: any[]): string {
 
 /**
  * Escreve valor na célula mestre de uma região mesclada (ou diretamente se não for mesclada).
- * O template Equatorial tem muitas células mescladas; escrever em célula não-mestre é no-op.
  */
 function setCellValue(ws: ExcelJS.Worksheet, cellRef: string, value: any) {
   const cell = ws.getCell(cellRef);
@@ -52,6 +51,73 @@ function setCellValue(ws: ExcelJS.Worksheet, cellRef: string, value: any) {
     (cell as any).master.value = value;
   } else {
     cell.value = value;
+  }
+}
+
+/**
+ * Limpa uma célula — zera o valor sem tocar em fórmulas, formatação ou validação.
+ * Preserva células que contenham fórmulas (value começa com '=').
+ */
+function clearCell(ws: ExcelJS.Worksheet, cellRef: string) {
+  const cell = ws.getCell(cellRef);
+  const val = cell.value;
+  // Não apagar fórmulas nativas do template
+  if (typeof val === 'string' && val.startsWith('=')) return;
+  if ((cell as any).isMerged && (cell as any).master) {
+    const master = (cell as any).master;
+    const mv = master.value;
+    if (typeof mv === 'string' && mv.startsWith('=')) return;
+    master.value = null;
+  } else {
+    cell.value = null;
+  }
+}
+
+/**
+ * Limpa todos os campos de dados das abas "0", "1" e "2" do template antes de
+ * escrever os dados do projeto. Isso garante que valores de exemplo do template
+ * não apareçam no arquivo gerado.
+ */
+function clearTemplateData(ws0: ExcelJS.Worksheet, ws1: ExcelJS.Worksheet, ws2?: ExcelJS.Worksheet | undefined) {
+  // ── ABA "0": módulos (linhas 7-16) e inversores (linhas 22-51) ──
+  for (let row = 7; row <= 16; row++) {
+    for (const col of ['C','D','H','K','P','T','AA']) {
+      clearCell(ws0, `${col}${row}`);
+    }
+  }
+  for (let row = 22; row <= 51; row++) {
+    for (const col of ['C','D','H','L','P','T','W','Z','AC']) {
+      clearCell(ws0, `${col}${row}`);
+    }
+  }
+
+  // ── ABA "1": todos os campos de dados do cliente, UC, GD e RT ──
+  const cellsAba1 = [
+    // Cliente
+    'C10','R10','AC9','C13','T13',
+    'D15','I15','Q15','V15',
+    // UC
+    'Z17','F27','L27','F29','P29','F31','H33','L33','T33',
+    // Geração distribuída
+    'G49','G51','I53','AC53',
+    // Responsável técnico
+    'C38','M38','Y38','C41','S41',
+    'C44','H44','P44','AB43','AB44',
+  ];
+  for (const ref of cellsAba1) {
+    clearCell(ws1, ref);
+  }
+
+  // ── ABA "2": dados de rateio (se existir e se o projeto usar rateio) ──
+  if (ws2) {
+    for (const ref of ['G3','K3','F4','M4','G5']) {
+      clearCell(ws2, ref);
+    }
+    for (let row = 9; row <= 58; row++) {
+      for (const col of ['B','C','G','J']) {
+        clearCell(ws2, `${col}${row}`);
+      }
+    }
   }
 }
 
@@ -87,37 +153,19 @@ export const NativeGenerator = {
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.readFile(TEMPLATE_EXCEL);
 
-      // ATENÇÃO: O template tem 5 abas: ROTEIRO(0), 0(1), 1(2), 2(3), FONTES(4)
-      // Portanto, devemos acessar pelo nome, não pelo índice!
+      // O template tem 5 abas: ROTEIRO, "0", "1", "2", FONTES
+      // Acessar sempre pelo nome para evitar confusão de índice
       const ws0 = workbook.getWorksheet('0');
       const ws1 = workbook.getWorksheet('1');
+      const ws2 = workbook.getWorksheet('2');
 
       if (!ws0) throw new Error('Aba "0" não encontrada no template Excel');
       if (!ws1) throw new Error('Aba "1" não encontrada no template Excel');
 
-      // ── ABA "0": Unidades Geradoras ────────────────────────────────────────
-      //
-      //  Linhas 7–16 = Módulos fotovoltaicos (até 10 itens)
-      //    C  = Nº item
-      //    D  = Potência do módulo (W)    [merged D:G]
-      //    H  = Quantidade                [merged H:J]
-      //    K  = Potência de pico (kWp)    [merged K:O]
-      //    P  = Área do arranjo (m²)      [merged P:S]
-      //    T  = Fabricante                [merged T:Z]
-      //    AA = Modelo                    [merged AA:AE]
-      //
-      //  Linhas 22–51 = Inversores (até 30 itens)
-      //    C  = Nº item
-      //    D  = Fabricante                [merged D:G]
-      //    H  = Modelo                    [merged H:K]
-      //    L  = Potência nominal (kW)     [merged L:O]
-      //    P  = Tensão nominal (V)        [merged P:S]
-      //    T  = Corrente máx (A)          [merged T:V]
-      //    W  = Fator de potência         [merged W:Y]
-      //    Z  = Rendimento (%)            [merged Z:AB]
-      //    AC = DHT (%)                   [merged AC:AE]
+      // Limpar dados de exemplo do template ANTES de escrever os novos dados
+      clearTemplateData(ws0, ws1, ws2 ?? undefined);
 
-      // Módulos (linhas 7–16)
+      // ── ABA "0": módulos (linhas 7–16) ────────────────────────────────────
       if (Array.isArray(data.modules)) {
         data.modules.forEach((mod: any, idx: number) => {
           if (idx >= 10) return;
@@ -138,12 +186,12 @@ export const NativeGenerator = {
         });
       }
 
-      // Inversores (linhas 22–51)
+      // ── ABA "0": inversores (linhas 22–51) ────────────────────────────────
       if (Array.isArray(data.inverters)) {
         data.inverters.forEach((inv: any, idx: number) => {
           if (idx >= 30) return;
-          const row   = 22 + idx;
-          const potKw = Number(inv.potencia_nominal_kw || inv.potencia || 0);
+          const row    = 22 + idx;
+          const potKw  = Number(inv.potencia_nominal_kw || inv.potencia || 0);
           const tensao = Number(inv.tensao_ca_nominal || inv.tensao || 220);
 
           setCellValue(ws0, `C${row}`, idx + 1);
@@ -158,35 +206,7 @@ export const NativeGenerator = {
         });
       }
 
-      // ── ABA "1": Dados Cadastrais ──────────────────────────────────────────
-      //
-      //  DADOS DO CLIENTE
-      //    C10  = Nome do cliente
-      //    R10  = CPF/CNPJ
-      //    AC9  = RG
-      //    C13  = Endereço completo
-      //    D15  = CEP      I15 = Cidade     Q15 = UF
-      //    V15  = E-mail   T13 = Celular
-      //
-      //  UNIDADE CONSUMIDORA
-      //    Z17  = Conta contrato
-      //    F27  = Tensão de atendimento     L27 = Tipo de ligação
-      //    F29  = Carga declarada           P29 = Disjuntor
-      //    F31  = Tipo ramal                H33 = Nº poste
-      //    L33  = Coordenada X              T33 = Coordenada Y
-      //
-      //  GERAÇÃO DISTRIBUÍDA (seção 3)
-      //    G49  = Fonte primária
-      //    G51  = Tipo de geração
-      //    I53  = Modalidade de compensação (enquadramento)
-      //    AC53 = Potência de geração (kWp total módulos)
-      //
-      //  RESPONSÁVEL TÉCNICO
-      //    C38 = Nome       M38 = Título     Y38 = Registro
-      //    C41 = E-mail     S41 = Celular
-      //    C44 = Endereço   H44 = Bairro     P44 = Cidade
-      //    AB43 = UF        AB44 = CEP
-
+      // ── ABA "1": dados cadastrais ──────────────────────────────────────────
       const totalModPower = (data.modules || []).reduce(
         (acc: number, m: any) => acc + (Number(m.potencia) * Number(m.qtd) / 1000), 0
       );
@@ -198,7 +218,7 @@ export const NativeGenerator = {
         }
       };
 
-      // Dados do cliente
+      // Cliente
       set('C10', 'nome_cliente');
       set('R10', 'cpf_cnpj');
       set('AC9', 'rg');
