@@ -44,65 +44,80 @@ function gerarDescricaoSistema(modules: any[], inverters: any[]): string {
   return `${modDesc} ligados a ${invDesc}`;
 }
 
-/**
- * Retorna o número de fases com base no tipo de ligação.
- * MONOFÁSICO/BIFÁSICO → "1", TRIFÁSICO → "√3"
- */
 function getNumFases(tipoLigacao: string): string {
-  return tipoLigacao?.toUpperCase().includes('TRIFÁSICO') ? '√3' : '1';
+  return tipoLigacao?.toUpperCase().includes('TRIFÁSICO') ? '\u221a3' : '1';
 }
 
-/**
- * Normaliza o tipo de ligação para minúsculas sem acento para uso em texto corrido.
- * Ex: "TRIFÁSICO" → "trifásico"
- */
 function tipoLigacaoLower(tipoLigacao: string): string {
   return (tipoLigacao || 'monofásico').toLowerCase();
 }
 
 /**
- * Pré-processa o ZIP do template Word substituindo textos hardcoded por tags {{}}
- * diretamente no XML, antes do docxtemplater renderizar.
+ * Pré-processa o ZIP do template Word substituindo textos hardcoded diretamente
+ * no XML comprimido (como o PizZip o lê), antes do docxtemplater renderizar.
  *
- * Isso é necessário porque o template DOCX tem alguns campos com texto fixo
- * (ex: "HONOR", "monofásico", "11517621") que deveriam ser tags mas não foram
- * substituídos quando o template foi criado.
+ * IMPORTANTE: as strings aqui devem ser exatamente como aparecem no XML
+ * comprimido do arquivo DOCX, não como aparecem após unpack.py (que expande
+ * e formata o XML adicionando indentação e xml:space="preserve").
  */
 function patchTemplateXml(zip: PizZip, data: Record<string, string>): void {
   const docXmlFile = zip.files['word/document.xml'];
   if (!docXmlFile) return;
 
   let xml = docXmlFile.asText();
-
-  // Substituições: texto hardcoded → valor real do projeto
-  const substitutions: [string, string][] = [
-    // Módulo na seção "Objetivo" e Tabela 3
-    [' 10 módulos HONOR, modelo HY-M12/132G de 700W ligados a 3 inversores marca FOXESS, modelo Q1-2500-E Certificado de Conformidade n° 004468/2025',
-     ` ${data.descricao_sistema}`],
-    // Tabela 3 - células individuais
-    ['>HONOR<', `>${data.mod_fabricante}<`],
-    ['>HY-M12/132G<', `>${data.mod_modelo}<`],
-    // Conta contrato na seção 3
-    ['>Número da Conta Contrato: 11517621<', `>Número da Conta Contrato: ${data.conta_contrato}<`],
-    // Tipo de ligação (seções 5.1, 5.4, 5.5) — todas as ocorrências em vermelho
-    ['xml:space="preserve">monofásico </w:t>', `xml:space="preserve">${data.tipo_ligacao_lower} </w:t>`],
-    ['xml:space="preserve">monofásica </w:t>', `xml:space="preserve">${data.tipo_ligacao_lower} </w:t>`],
-    // Potência disponibilizada - fórmula (seção 5.3)
-    ['xml:space="preserve"> = XXX V</w:t>', `xml:space="preserve"> = ${data.tensao_atendimento} V</w:t>`],
-    ['xml:space="preserve"> = XXX A </w:t>', `xml:space="preserve"> = ${data.disjuntor_entrada} A </w:t>`],
-    ['>NF = X<', `>NF = ${data.num_fases}<`],
-    ['xml:space="preserve">FP = XXX </w:t>', `xml:space="preserve">FP = 0,92 </w:t>`],
-  ];
-
   let count = 0;
-  for (const [from, to] of substitutions) {
+
+  // Helper — substitui todas as ocorrências e incrementa contador se houve match
+  const replace = (from: string, to: string) => {
     if (from && xml.includes(from)) {
       xml = xml.split(from).join(to);
       count++;
     }
-  }
+  };
 
-  console.log(`[NativeGenerator] Patch do template: ${count}/${substitutions.length} substituições aplicadas`);
+  // ── Seção 1 — Objetivo: descrição do sistema ──────────────────────────────
+  // No XML comprimido o run é: <w:t>10 módulos HONOR, modelo HY-M12/132G...</w:t>
+  replace(
+    '<w:t>10 módulos HONOR, modelo HY-M12/132G de 700W ligados a 3 inversores marca FOXESS, modelo Q1-2500-E Certificado de Conformidade n° 004468/2025</w:t>',
+    `<w:t>${data.descricao_sistema}</w:t>`
+  );
+
+  // ── Seção 3 — Dados da UC: conta contrato ────────────────────────────────
+  // O número 11517621 está em run próprio: <w:t>11517621</w:t>
+  replace('<w:t>11517621</w:t>', `<w:t>${data.conta_contrato}</w:t>`);
+
+  // ── Capa — tensão 220V ────────────────────────────────────────────────────
+  // <w:t>220V</w:t> (negrito vermelho na capa)
+  replace('<w:t>220V</w:t>', `<w:t>${data.tensao_atendimento}V</w:t>`);
+
+  // ── Tabela 3 — fabricante e modelo do módulo ──────────────────────────────
+  // No XML comprimido ficam: <w:t>ERA SOLAR</w:t> e <w:t>EAGLE PRO-66HD 700W</w:t>
+  // mas no template original são HONOR e HY-M12/132G. Substituir ambos:
+  replace('<w:t>HONOR</w:t>', `<w:t>${data.mod_fabricante}</w:t>`);
+  replace('<w:t>HY-M12/132G</w:t>', `<w:t>${data.mod_modelo}</w:t>`);
+
+  // ── Seções 5.1, 5.5 — tipo de ligação (monofásico) ───────────────────────
+  // <w:t>monofásico</w:t>  (ocorre 2x: seções 5.1 e 5.5)
+  replace('<w:t>monofásico</w:t>', `<w:t>${data.tipo_ligacao_lower}</w:t>`);
+
+  // ── Seção 5.4 — caixa de medição (monofásica) ─────────────────────────────
+  replace('<w:t>monofásica</w:t>', `<w:t>${data.tipo_ligacao_lower}</w:t>`);
+
+  // ── Seção 5.3 — Potência Disponibilizada: IDG = XXX A ────────────────────
+  // VN = XXX V está fragmentado em V + subscript(N) + run(" = XXX V")
+  // Mas como o gerado mostra "= 380 V" (patch anterior funcionou parcialmente),
+  // vamos garantir que substituímos o padrão correto:
+  replace('<w:t xml:space="preserve"> = XXX A</w:t>', `<w:t xml:space="preserve"> = ${data.disjuntor_entrada} A</w:t>`);
+  replace('<w:t xml:space="preserve"> = XXX V</w:t>', `<w:t xml:space="preserve"> = ${data.tensao_atendimento} V</w:t>`);
+
+  // ── Seção 5.3 — NF = X (fragmentado em dois runs: "NF" + " = X") ─────────
+  // Substituir o segundo run que contém " = X"
+  replace('<w:t xml:space="preserve"> = X</w:t>', `<w:t xml:space="preserve"> = ${data.num_fases}</w:t>`);
+
+  // ── Seção 5.3 — FP = XXX ─────────────────────────────────────────────────
+  replace('<w:t>FP = XXX</w:t>', '<w:t>FP = 0,92</w:t>');
+
+  console.log(`[NativeGenerator] patchTemplateXml: ${count} substituições aplicadas`);
   zip.file('word/document.xml', xml);
 }
 
@@ -118,9 +133,6 @@ function setCellValue(ws: ExcelJS.Worksheet, cellRef: string, value: any) {
   }
 }
 
-/**
- * Limpa uma célula — zera o valor sem tocar em fórmulas, formatação ou validação.
- */
 function clearCell(ws: ExcelJS.Worksheet, cellRef: string) {
   const cell = ws.getCell(cellRef);
   const val = cell.value;
@@ -135,10 +147,6 @@ function clearCell(ws: ExcelJS.Worksheet, cellRef: string) {
   }
 }
 
-/**
- * Limpa todos os campos de dados das abas "0", "1" e "2" do template antes de
- * escrever os dados do projeto.
- */
 function clearTemplateData(ws0: ExcelJS.Worksheet, ws1: ExcelJS.Worksheet, ws2?: ExcelJS.Worksheet | undefined) {
   for (let row = 7; row <= 16; row++) {
     for (const col of ['C','D','H','K','P','T','AA']) {
@@ -194,8 +202,6 @@ export function consolidateItems(items: any[], type: 'module' | 'inverter'): any
 
 export const NativeGenerator = {
 
-  // ── Excel ──────────────────────────────────────────────────────────────────
-
   async generateExcel(data: any): Promise<{ success: boolean; filePath?: string; error?: string }> {
     try {
       console.log(`[NativeGenerator] Gerando Excel para: ${data.nome_cliente}`);
@@ -216,7 +222,6 @@ export const NativeGenerator = {
 
       clearTemplateData(ws0, ws1, ws2 ?? undefined);
 
-      // Módulos (linhas 7–16)
       if (Array.isArray(data.modules)) {
         data.modules.forEach((mod: any, idx: number) => {
           if (idx >= 10) return;
@@ -237,7 +242,6 @@ export const NativeGenerator = {
         });
       }
 
-      // Inversores (linhas 22–51)
       if (Array.isArray(data.inverters)) {
         data.inverters.forEach((inv: any, idx: number) => {
           if (idx >= 30) return;
@@ -257,7 +261,6 @@ export const NativeGenerator = {
         });
       }
 
-      // Aba 1 — dados cadastrais
       const totalModPower = (data.modules || []).reduce(
         (acc: number, m: any) => acc + (Number(m.potencia) * Number(m.qtd) / 1000), 0
       );
@@ -320,8 +323,6 @@ export const NativeGenerator = {
     }
   },
 
-  // ── Word ───────────────────────────────────────────────────────────────────
-
   async generateWord(data: any): Promise<{ success: boolean; filePath?: string; error?: string }> {
     try {
       console.log(`[NativeGenerator] Gerando Word com docxtemplater para: ${data.nome_cliente}`);
@@ -333,22 +334,23 @@ export const NativeGenerator = {
       const content = fs.readFileSync(TEMPLATE_WORD, 'binary');
       const zip = new PizZip(content);
 
-      // Derivar variáveis extras que o template precisa
-      const tipoLig = data.tipo_ligacao || 'MONOFÁSICO';
-      const descSistema = gerarDescricaoSistema(data.modules || [], data.inverters || []);
-      const modFabricante = (data.modules?.[0]?.fabricante || '').toUpperCase();
-      const modModelo     = (data.modules?.[0]?.modelo     || '').toUpperCase();
+      const tipoLig        = data.tipo_ligacao || 'MONOFÁSICO';
+      const descSistema    = gerarDescricaoSistema(data.modules || [], data.inverters || []);
+      const modFabricante  = (data.modules?.[0]?.fabricante || '').toUpperCase();
+      const modModelo      = (data.modules?.[0]?.modelo     || '').toUpperCase();
+      const tensao         = String(data.tensao_atendimento || '220');
+      const disjuntor      = String(data.disjuntor_entrada  || '');
 
-      // Pré-processar o XML para substituir textos hardcoded do template
+      // Pré-processar XML com strings exatas do ZIP comprimido
       patchTemplateXml(zip, {
-        descricao_sistema:    descSistema,
-        mod_fabricante:       modFabricante,
-        mod_modelo:           modModelo,
-        conta_contrato:       data.conta_contrato || '',
-        tipo_ligacao_lower:   tipoLigacaoLower(tipoLig),
-        tensao_atendimento:   data.tensao_atendimento || '',
-        disjuntor_entrada:    data.entryBreakerCurrent?.toString() || data.disjuntor_entrada || '',
-        num_fases:            getNumFases(tipoLig),
+        descricao_sistema:  descSistema,
+        mod_fabricante:     modFabricante,
+        mod_modelo:         modModelo,
+        conta_contrato:     data.conta_contrato || '',
+        tipo_ligacao_lower: tipoLigacaoLower(tipoLig),
+        tensao_atendimento: tensao,
+        disjuntor_entrada:  disjuntor,
+        num_fases:          getNumFases(tipoLig),
       });
 
       const doc = new Docxtemplater(zip, {
@@ -380,7 +382,7 @@ export const NativeGenerator = {
         coordenada_y:             data.coordenada_y || '',
         numero_poste:             data.numero_poste || '',
         enquadramento:            data.enquadramento || '',
-        tensao_atendimento:       data.tensao_atendimento || '',
+        tensao_atendimento:       tensao,
         tipo_ligacao:             tipoLig,
         tipo_ligacao_lower:       tipoLigacaoLower(tipoLig),
         potencia_disponibilizada: data.potencia_disponibilizada || '',
@@ -425,7 +427,6 @@ export const NativeGenerator = {
         inv_frequencia:          data.inverters?.[0]?.frequencia        || '',
         inv_thd:                 data.inverters?.[0]?.thd               || '',
         inv_fator_potencia:      data.inverters?.[0]?.fator_potencia    || '',
-        inv_certif_numero:       data.inverters?.[0]?.certificationNumber || '',
         certif_numero:           data.inverters?.[0]?.certificationNumber || '',
       };
 
