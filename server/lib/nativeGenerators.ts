@@ -53,12 +53,21 @@ function tipoLigacaoLower(tipoLigacao: string): string {
 }
 
 /**
+ * Formata potência total em kWp com vírgula brasileira.
+ * Ex: 15400 W → "15,40" | 7000 W → "7,00"
+ */
+function formatPotenciaKwp(totalInstalledPowerW: number): string {
+  return (totalInstalledPowerW / 1000).toFixed(2).replace('.', ',');
+}
+
+/**
  * Pré-processa o ZIP do template Word substituindo textos hardcoded diretamente
  * no XML comprimido (como o PizZip o lê), antes do docxtemplater renderizar.
  *
- * IMPORTANTE: as strings aqui devem ser exatamente como aparecem no XML
- * comprimido do arquivo DOCX, não como aparecem após unpack.py (que expande
- * e formata o XML adicionando indentação e xml:space="preserve").
+ * IMPORTANTE: as strings aqui devem ser EXATAMENTE como aparecem no XML
+ * comprimido do arquivo DOCX — sem indentação, sem quebras de linha extras.
+ * Use zipfile.ZipFile + z.read('word/document.xml').decode('utf-8') para
+ * verificar as strings exatas antes de alterar.
  */
 function patchTemplateXml(zip: PizZip, data: Record<string, string>): void {
   const docXmlFile = zip.files['word/document.xml'];
@@ -67,7 +76,6 @@ function patchTemplateXml(zip: PizZip, data: Record<string, string>): void {
   let xml = docXmlFile.asText();
   let count = 0;
 
-  // Helper — substitui todas as ocorrências e incrementa contador se houve match
   const replace = (from: string, to: string) => {
     if (from && xml.includes(from)) {
       xml = xml.split(from).join(to);
@@ -75,43 +83,45 @@ function patchTemplateXml(zip: PizZip, data: Record<string, string>): void {
     }
   };
 
-  // ── Seção 1 — Objetivo: descrição do sistema ──────────────────────────────
-  // No XML comprimido o run é: <w:t>10 módulos HONOR, modelo HY-M12/132G...</w:t>
+  // ── Seção 1 + Capa — potência total (kWp) ────────────────────────────────
+  // '<w:t>7,00</w:t>' aparece 3x no template:
+  //   - pos ~9212:  capa (vermelho) → substituir pela potência real
+  //   - pos ~99202: seção 1 objetivo (vermelho) → substituir pela potência real
+  //   - pos ~342974: PD da seção 5.3 (preto, calculado) → também atualizar
+  // Como todas as 3 têm a mesma string, substituímos todas de uma vez.
+  replace('<w:t>7,00</w:t>', `<w:t>${data.potencia_total_kwp}</w:t>`);
+
+  // ── Capa + Seção 1 — enquadramento ───────────────────────────────────────
+  // '<w:t>AUTOCONSUMO REMOTO</w:t>' aparece 2x (capa e seção 1)
+  replace('<w:t>AUTOCONSUMO REMOTO</w:t>', `<w:t>${data.enquadramento}</w:t>`);
+
+  // ── Seção 1 — descrição do sistema ───────────────────────────────────────
   replace(
     '<w:t>10 módulos HONOR, modelo HY-M12/132G de 700W ligados a 3 inversores marca FOXESS, modelo Q1-2500-E Certificado de Conformidade n° 004468/2025</w:t>',
     `<w:t>${data.descricao_sistema}</w:t>`
   );
 
-  // ── Seção 3 — Dados da UC: conta contrato ────────────────────────────────
-  // O número 11517621 está em run próprio: <w:t>11517621</w:t>
+  // ── Seção 3 — conta contrato ──────────────────────────────────────────────
   replace('<w:t>11517621</w:t>', `<w:t>${data.conta_contrato}</w:t>`);
 
-  // ── Capa — tensão 220V ────────────────────────────────────────────────────
-  // <w:t>220V</w:t> (negrito vermelho na capa)
+  // ── Capa — tensão de atendimento ──────────────────────────────────────────
   replace('<w:t>220V</w:t>', `<w:t>${data.tensao_atendimento}V</w:t>`);
 
   // ── Tabela 3 — fabricante e modelo do módulo ──────────────────────────────
-  // No XML comprimido ficam: <w:t>ERA SOLAR</w:t> e <w:t>EAGLE PRO-66HD 700W</w:t>
-  // mas no template original são HONOR e HY-M12/132G. Substituir ambos:
   replace('<w:t>HONOR</w:t>', `<w:t>${data.mod_fabricante}</w:t>`);
   replace('<w:t>HY-M12/132G</w:t>', `<w:t>${data.mod_modelo}</w:t>`);
 
   // ── Seções 5.1, 5.5 — tipo de ligação (monofásico) ───────────────────────
-  // <w:t>monofásico</w:t>  (ocorre 2x: seções 5.1 e 5.5)
   replace('<w:t>monofásico</w:t>', `<w:t>${data.tipo_ligacao_lower}</w:t>`);
 
   // ── Seção 5.4 — caixa de medição (monofásica) ─────────────────────────────
   replace('<w:t>monofásica</w:t>', `<w:t>${data.tipo_ligacao_lower}</w:t>`);
 
-  // ── Seção 5.3 — Potência Disponibilizada: IDG = XXX A ────────────────────
-  // VN = XXX V está fragmentado em V + subscript(N) + run(" = XXX V")
-  // Mas como o gerado mostra "= 380 V" (patch anterior funcionou parcialmente),
-  // vamos garantir que substituímos o padrão correto:
+  // ── Seção 5.3 — IDG = XXX A ───────────────────────────────────────────────
   replace('<w:t xml:space="preserve"> = XXX A</w:t>', `<w:t xml:space="preserve"> = ${data.disjuntor_entrada} A</w:t>`);
   replace('<w:t xml:space="preserve"> = XXX V</w:t>', `<w:t xml:space="preserve"> = ${data.tensao_atendimento} V</w:t>`);
 
-  // ── Seção 5.3 — NF = X (fragmentado em dois runs: "NF" + " = X") ─────────
-  // Substituir o segundo run que contém " = X"
+  // ── Seção 5.3 — NF = X (fragmentado: run "NF" + run " = X") ─────────────
   replace('<w:t xml:space="preserve"> = X</w:t>', `<w:t xml:space="preserve"> = ${data.num_fases}</w:t>`);
 
   // ── Seção 5.3 — FP = XXX ─────────────────────────────────────────────────
@@ -334,15 +344,24 @@ export const NativeGenerator = {
       const content = fs.readFileSync(TEMPLATE_WORD, 'binary');
       const zip = new PizZip(content);
 
-      const tipoLig        = data.tipo_ligacao || 'MONOFÁSICO';
-      const descSistema    = gerarDescricaoSistema(data.modules || [], data.inverters || []);
-      const modFabricante  = (data.modules?.[0]?.fabricante || '').toUpperCase();
-      const modModelo      = (data.modules?.[0]?.modelo     || '').toUpperCase();
-      const tensao         = String(data.tensao_atendimento || '220');
-      const disjuntor      = String(data.disjuntor_entrada  || '');
+      const tipoLig       = data.tipo_ligacao || 'MONOFÁSICO';
+      const descSistema   = gerarDescricaoSistema(data.modules || [], data.inverters || []);
+      const modFabricante = (data.modules?.[0]?.fabricante || '').toUpperCase();
+      const modModelo     = (data.modules?.[0]?.modelo     || '').toUpperCase();
+      const tensao        = String(data.tensao_atendimento || '220');
+      const disjuntor     = String(data.disjuntor_entrada  || '');
+      const enquadramento = data.enquadramento || 'AUTOCONSUMO LOCAL';
+
+      // Calcular potência total em kWp a partir dos módulos
+      const totalWatts = (data.modules || []).reduce(
+        (acc: number, m: any) => acc + (Number(m.potencia || 0) * Number(m.qtd || 0)), 0
+      );
+      const potenciaKwp = formatPotenciaKwp(totalWatts);
 
       // Pré-processar XML com strings exatas do ZIP comprimido
       patchTemplateXml(zip, {
+        potencia_total_kwp: potenciaKwp,
+        enquadramento,
         descricao_sistema:  descSistema,
         mod_fabricante:     modFabricante,
         mod_modelo:         modModelo,
@@ -370,7 +389,7 @@ export const NativeGenerator = {
         cidade_uf:                `${data.cidade || ''} \u2013 ${data.uf || ''}`,
         estado:                   getEstadoExtenso(data.uf || ''),
         estado_extenso:           getEstadoExtenso(data.uf || ''),
-        potencia_total_kw:        data.potencia_total_kw || '',
+        potencia_total_kw:        potenciaKwp,
         resp_tecnico_nome:        data.resp_tecnico_nome || '',
         resp_tecnico_titulo:      data.resp_tecnico_titulo || '',
         resp_tecnico_registro:    data.resp_tecnico_registro || '',
@@ -381,7 +400,7 @@ export const NativeGenerator = {
         coordenada_x:             data.coordenada_x || '',
         coordenada_y:             data.coordenada_y || '',
         numero_poste:             data.numero_poste || '',
-        enquadramento:            data.enquadramento || '',
+        enquadramento,
         tensao_atendimento:       tensao,
         tipo_ligacao:             tipoLig,
         tipo_ligacao_lower:       tipoLigacaoLower(tipoLig),
@@ -427,7 +446,7 @@ export const NativeGenerator = {
         inv_frequencia:          data.inverters?.[0]?.frequencia        || '',
         inv_thd:                 data.inverters?.[0]?.thd               || '',
         inv_fator_potencia:      data.inverters?.[0]?.fator_potencia    || '',
-        certif_numero:           data.inverters?.[0]?.certificationNumber || '',
+        certif_numero:           data.inverters?.[0]?.certif_numero     || '',
       };
 
       doc.render(templateData);
