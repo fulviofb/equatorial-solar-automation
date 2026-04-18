@@ -52,22 +52,13 @@ function tipoLigacaoLower(tipoLigacao: string): string {
   return (tipoLigacao || 'monofásico').toLowerCase();
 }
 
-/**
- * Formata potência total em kWp com vírgula brasileira.
- * Ex: 15400 W → "15,40" | 7000 W → "7,00"
- */
 function formatPotenciaKwp(totalInstalledPowerW: number): string {
   return (totalInstalledPowerW / 1000).toFixed(2).replace('.', ',');
 }
 
 /**
  * Pré-processa o ZIP do template Word substituindo textos hardcoded diretamente
- * no XML comprimido (como o PizZip o lê), antes do docxtemplater renderizar.
- *
- * IMPORTANTE: as strings aqui devem ser EXATAMENTE como aparecem no XML
- * comprimido do arquivo DOCX — sem indentação, sem quebras de linha extras.
- * Use zipfile.ZipFile + z.read('word/document.xml').decode('utf-8') para
- * verificar as strings exatas antes de alterar.
+ * no XML comprimido, antes do docxtemplater renderizar.
  */
 function patchTemplateXml(zip: PizZip, data: Record<string, string>): void {
   const docXmlFile = zip.files['word/document.xml'];
@@ -83,16 +74,10 @@ function patchTemplateXml(zip: PizZip, data: Record<string, string>): void {
     }
   };
 
-  // ── Seção 1 + Capa — potência total (kWp) ────────────────────────────────
-  // '<w:t>7,00</w:t>' aparece 3x no template:
-  //   - pos ~9212:  capa (vermelho) → substituir pela potência real
-  //   - pos ~99202: seção 1 objetivo (vermelho) → substituir pela potência real
-  //   - pos ~342974: PD da seção 5.3 (preto, calculado) → também atualizar
-  // Como todas as 3 têm a mesma string, substituímos todas de uma vez.
+  // ── Potência total kWp (capa, seção 1 e seção 5.3) ───────────────────────
   replace('<w:t>7,00</w:t>', `<w:t>${data.potencia_total_kwp}</w:t>`);
 
-  // ── Capa + Seção 1 — enquadramento ───────────────────────────────────────
-  // '<w:t>AUTOCONSUMO REMOTO</w:t>' aparece 2x (capa e seção 1)
+  // ── Enquadramento (capa + seção 1) ───────────────────────────────────────
   replace('<w:t>AUTOCONSUMO REMOTO</w:t>', `<w:t>${data.enquadramento}</w:t>`);
 
   // ── Seção 1 — descrição do sistema ───────────────────────────────────────
@@ -111,21 +96,30 @@ function patchTemplateXml(zip: PizZip, data: Record<string, string>): void {
   replace('<w:t>HONOR</w:t>', `<w:t>${data.mod_fabricante}</w:t>`);
   replace('<w:t>HY-M12/132G</w:t>', `<w:t>${data.mod_modelo}</w:t>`);
 
-  // ── Seções 5.1, 5.5 — tipo de ligação (monofásico) ───────────────────────
+  // ── Tipo de ligação (seções 5.1, 5.4, 5.5) ───────────────────────────────
   replace('<w:t>monofásico</w:t>', `<w:t>${data.tipo_ligacao_lower}</w:t>`);
-
-  // ── Seção 5.4 — caixa de medição (monofásica) ─────────────────────────────
   replace('<w:t>monofásica</w:t>', `<w:t>${data.tipo_ligacao_lower}</w:t>`);
 
-  // ── Seção 5.3 — IDG = XXX A ───────────────────────────────────────────────
+  // ── Seção 5.3 — fórmula PD ───────────────────────────────────────────────
   replace('<w:t xml:space="preserve"> = XXX A</w:t>', `<w:t xml:space="preserve"> = ${data.disjuntor_entrada} A</w:t>`);
   replace('<w:t xml:space="preserve"> = XXX V</w:t>', `<w:t xml:space="preserve"> = ${data.tensao_atendimento} V</w:t>`);
-
-  // ── Seção 5.3 — NF = X (fragmentado: run "NF" + run " = X") ─────────────
   replace('<w:t xml:space="preserve"> = X</w:t>', `<w:t xml:space="preserve"> = ${data.num_fases}</w:t>`);
-
-  // ── Seção 5.3 — FP = XXX ─────────────────────────────────────────────────
   replace('<w:t>FP = XXX</w:t>', '<w:t>FP = 0,92</w:t>');
+
+  // ── Tabela 4 — "Entrada" duplicado: segunda ocorrência deve ser "Saída" ───
+  // O template tem "Entrada" em dois cabeçalhos de seção:
+  //   1ª = seção CC (correto — manter como "Entrada")
+  //   2ª = seção CA (errado — deve ser "Saída")
+  // Como as strings são idênticas, usamos split com maxsplit=2 para
+  // manter a primeira e substituir a segunda.
+  const ENTRADA_TAG = '<w:t>Entrada</w:t>';
+  const SAIDA_TAG   = '<w:t>Sa\u00edda</w:t>'; // "Saída" com í em UTF-8
+  const parts = xml.split(ENTRADA_TAG);
+  if (parts.length >= 3) {
+    // parts[0] + ENTRADA + parts[1] + SAIDA + parts[2..] reunidos
+    xml = parts[0] + ENTRADA_TAG + parts.slice(1, -1).join(ENTRADA_TAG) + SAIDA_TAG + parts[parts.length - 1];
+    count++;
+  }
 
   console.log(`[NativeGenerator] patchTemplateXml: ${count} substituições aplicadas`);
   zip.file('word/document.xml', xml);
@@ -358,7 +352,6 @@ export const NativeGenerator = {
       );
       const potenciaKwp = formatPotenciaKwp(totalWatts);
 
-      // Pré-processar XML com strings exatas do ZIP comprimido
       patchTemplateXml(zip, {
         potencia_total_kwp: potenciaKwp,
         enquadramento,
@@ -377,6 +370,16 @@ export const NativeGenerator = {
         linebreaks: true,
         delimiters: { start: '{{', end: '}}' },
       });
+
+      // Potência nominal CA do inversor em kW (ex: 3000W → "3,00")
+      const invPotNomCA = data.inverters?.[0]?.potencia_nominal_kw
+        ? (Number(data.inverters[0].potencia_nominal_kw) / 1000).toFixed(2).replace('.', ',')
+        : data.inverters?.[0]?.potencia_nominal_kw_fmt || '';
+
+      // Potência máxima CC em kW (nominalPowerDC em W → kW)
+      const invPotMaxCC = data.inverters?.[0]?.potencia_max_cc
+        ? (Number(data.inverters[0].potencia_max_cc) / 1000).toFixed(2).replace('.', ',')
+        : invPotNomCA; // fallback: igual à CA
 
       const templateData = {
         nome_cliente:             data.nome_cliente || '',
@@ -429,21 +432,24 @@ export const NativeGenerator = {
         inv_fabricante:          data.inverters?.[0]?.fabricante        || '',
         inv_modelo:              data.inverters?.[0]?.modelo            || '',
         inv_quantidade:          data.inverters?.reduce((acc: number, i: any) => acc + (i.qtd || 0), 0) || 0,
-        inv_corrente_cc_max:     data.inverters?.[0]?.corrente_cc_max   || '',
-        inv_corrente_ca_max:     data.inverters?.[0]?.corrente_ca_max   || '',
-        inv_eficiencia_max:      data.inverters?.[0]?.eficiencia_max    || '',
-        inv_eficiencia_eu:       data.inverters?.[0]?.eficiencia_eu     || '',
-        inv_tipo_conexao:        data.inverters?.[0]?.tipo_conexao      || '',
-        inv_potencia_nominal_kw: data.inverters?.[0]?.potencia_nominal_kw_fmt || '',
-        inv_potencia_max_cc:     data.inverters?.[0]?.potencia_max_cc   || '',
+        // Lado CC
+        inv_potencia_nominal_kw: invPotMaxCC,   // Pn CC = potência máxima CC em kW
+        inv_potencia_max_cc:     invPotMaxCC,
         inv_tensao_cc_max:       data.inverters?.[0]?.tensao_cc_max     || '',
+        inv_corrente_cc_max:     data.inverters?.[0]?.corrente_cc_max   || '',
         inv_tensao_mppt_max:     data.inverters?.[0]?.tensao_mppt_max   || '',
         inv_tensao_mppt_min:     data.inverters?.[0]?.tensao_mppt_min   || '',
         inv_tensao_partida:      data.inverters?.[0]?.tensao_partida    || '',
         inv_num_strings:         data.inverters?.[0]?.num_strings       || '',
         inv_num_mppt:            data.inverters?.[0]?.num_mppt          || '',
+        // Lado CA
+        inv_potencia_nominal_ca: invPotNomCA,   // Pca = potência nominal CA em kW
+        inv_corrente_ca_max:     data.inverters?.[0]?.corrente_ca_max   || '',
         inv_tensao_ca_nominal:   data.inverters?.[0]?.tensao_ca_nominal || '',
         inv_frequencia:          data.inverters?.[0]?.frequencia        || '',
+        inv_eficiencia_max:      data.inverters?.[0]?.eficiencia_max    || '',
+        inv_eficiencia_eu:       data.inverters?.[0]?.eficiencia_eu     || '',
+        inv_tipo_conexao:        data.inverters?.[0]?.tipo_conexao      || '',
         inv_thd:                 data.inverters?.[0]?.thd               || '',
         inv_fator_potencia:      data.inverters?.[0]?.fator_potencia    || '',
         certif_numero:           data.inverters?.[0]?.certif_numero     || '',
