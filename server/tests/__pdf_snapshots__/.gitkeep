@@ -1,0 +1,10 @@
+# Diretório de snapshots visuais do gerador de PDF
+
+Arquivos PDF gerados por `server/tests/generatePdfSnapshot.ts` são
+commitados neste diretório. Eles servem como referência visual durante
+o desenvolvimento e permitem comparar o output do gerador com a Figura 5
+da NT.00020.EQTL.
+
+Para regenerar os snapshots:
+
+    pnpm tsx server/tests/generatePdfSnapshot.ts
